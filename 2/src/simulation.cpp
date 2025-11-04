@@ -45,11 +45,11 @@ double ContaminationSimulation::computeAdvection(int i, int j)
     // Upwind scheme for advection (negative sign for correct physics)
     if (i > 0)
     {
-        advection_x = -WIND_X * (grid[i][j] - grid[i - 1][j]) / CELL_EDGE;
+        advection_x = -WIND_X * (grid[i][j] - grid[i - 1][j]) / DX;
     }
     if (j > 0)
     {
-        advection_y = -WIND_Y * (grid[i][j] - grid[i][j - 1]) / CELL_EDGE;
+        advection_y = -WIND_Y * (grid[i][j] - grid[i][j - 1]) / DY;
     }
 
     return advection_x + advection_y;
@@ -62,11 +62,11 @@ double ContaminationSimulation::computeDiffusion(int i, int j)
     // Central difference scheme for diffusion
     if (i > 0 && i < rows - 1)
     {
-        diffusion += DIFFUSION_COEFF * (grid[i + 1][j] - 2 * grid[i][j] + grid[i - 1][j]) / (CELL_EDGE * CELL_EDGE);
+        diffusion += DIFFUSION_COEFF * (grid[i + 1][j] - 2 * grid[i][j] + grid[i - 1][j]) / (DX * DX);
     }
     if (j > 0 && j < cols - 1)
     {
-        diffusion += DIFFUSION_COEFF * (grid[i][j + 1] - 2 * grid[i][j] + grid[i][j - 1]) / (CELL_EDGE * CELL_EDGE);
+        diffusion += DIFFUSION_COEFF * (grid[i][j + 1] - 2 * grid[i][j] + grid[i][j - 1]) / (DY * DY);
     }
 
     return diffusion;

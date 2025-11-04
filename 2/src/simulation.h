@@ -4,8 +4,9 @@
 #include <vector>
 
 // Physical constants
-constexpr int GRID_SIZE = 4000;      // 4000x4000 grid
-constexpr double CELL_EDGE = 10.0;   // 100 m² per cell
+constexpr int GRID_SIZE = 4000; // 4000x4000 grid
+constexpr double DX = 10.0;     // 100 m² per cell
+constexpr double DY = 10.0;
 constexpr int SIMULATION_TIME = 100; // 100 steps (100 seconds with dt=1.0)
 constexpr double TIME_STEP = 1.0;    // 1.0 second per step
 

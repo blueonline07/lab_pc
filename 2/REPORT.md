@@ -25,7 +25,7 @@ Where:
 | Parameter             | Value        | Description                  |
 | --------------------- | ------------ | ---------------------------- |
 | Grid Size             | 4000×4000    | Computational domain         |
-| Cell Area             | 100.0         | Area per grid cell           |
+| Cell Area             | 100.0        | Area per grid cell           |
 | Simulation Time       | 100 seconds  | Total simulation duration    |
 | Time Step             | 1.0 second   | Time increment per iteration |
 | Wind Velocity         | (0.33, 0.14) | Wind components              |
@@ -43,8 +43,8 @@ The PDE is discretized using finite differences on a regular grid:
 #### Advection Term (Upwind Scheme)
 
 ```cpp
-advection_x = -WIND_X * (C[i][j] - C[i-1][j]) / CELL_AREA
-advection_y = -WIND_Y * (C[i][j] - C[i][j-1]) / CELL_AREA
+advection_x = -WIND_X * (C[i][j] - C[i-1][j]) / DX
+advection_y = -WIND_Y * (C[i][j] - C[i][j-1]) / DY
 ```
 
 The negative sign ensures correct physical direction of transport.
@@ -53,8 +53,8 @@ The negative sign ensures correct physical direction of transport.
 
 ```cpp
 diffusion = DIFFUSION_COEFF * (
-    (C[i+1][j] - 2*C[i][j] + C[i-1][j]) / (CELL_AREA²) +
-    (C[i][j+1] - 2*C[i][j] + C[i][j-1]) / (CELL_AREA²)
+    (C[i+1][j] - 2*C[i][j] + C[i-1][j]) / (DX²) +
+    (C[i][j+1] - 2*C[i][j] + C[i][j-1]) / (DY²)
 )
 ```
 
