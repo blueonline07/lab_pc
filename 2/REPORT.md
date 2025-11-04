@@ -43,11 +43,9 @@ The PDE is discretized using finite differences on a regular grid:
 #### Advection Term (Upwind Scheme)
 
 ```cpp
-advection_x = -WIND_X * (C[i][j] - C[i-1][j]) / DX
-advection_y = -WIND_Y * (C[i][j] - C[i][j-1]) / DY
+advection_x = WIND_X * (C[i][j] - C[i-1][j]) / DX
+advection_y = WIND_Y * (C[i][j] - C[i][j-1]) / DY
 ```
-
-The negative sign ensures correct physical direction of transport.
 
 #### Diffusion Term (Central Difference)
 
@@ -61,7 +59,7 @@ diffusion = DIFFUSION_COEFF * (
 #### Time Integration (Forward Euler)
 
 ```cpp
-C_new[i][j] = C[i][j] + TIME_STEP * (advection + diffusion - decay)
+C_new[i][j] = C[i][j] + TIME_STEP * (-advection + diffusion - decay)
 ```
 
 Where `decay = (DECAY_RATE + DEPOSITION_RATE) * C[i][j]`

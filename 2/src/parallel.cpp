@@ -148,22 +148,22 @@ int main(int argc, char *argv[])
                 // Advection (upwind scheme with negative sign for correct physics)
                 if (i > 0)
                 {
-                    advection_x = -WIND_X * (local_sim.getGrid()[i][j] - local_sim.getGrid()[i - 1][j]) / CELL_EDGE;
+                    advection_x = WIND_X * (local_sim.getGrid()[i][j] - local_sim.getGrid()[i - 1][j]) / DX;
                 }
                 if (j > 0)
                 {
-                    advection_y = -WIND_Y * (local_sim.getGrid()[i][j] - local_sim.getGrid()[i][j - 1]) / CELL_EDGE;
+                    advection_y = WIND_Y * (local_sim.getGrid()[i][j] - local_sim.getGrid()[i][j - 1]) / DY;
                 }
 
                 // Diffusion (central difference)
-                diffusion = DIFFUSION_COEFF * ((local_sim.getGrid()[i + 1][j] - 2 * local_sim.getGrid()[i][j] + local_sim.getGrid()[i - 1][j]) / (CELL_EDGE * CELL_EDGE) +
-                                               (local_sim.getGrid()[i][j + 1] - 2 * local_sim.getGrid()[i][j] + local_sim.getGrid()[i][j - 1]) / (CELL_EDGE * CELL_EDGE));
+                diffusion = DIFFUSION_COEFF * ((local_sim.getGrid()[i + 1][j] - 2 * local_sim.getGrid()[i][j] + local_sim.getGrid()[i - 1][j]) / (DX * DX) +
+                                               (local_sim.getGrid()[i][j + 1] - 2 * local_sim.getGrid()[i][j] + local_sim.getGrid()[i][j - 1]) / (DY * DY));
 
                 // Decay
                 double decay = (DECAY_RATE + DEPOSITION_RATE) * local_sim.getGrid()[i][j];
 
                 // Forward Euler time integration
-                double new_value = local_sim.getGrid()[i][j] + TIME_STEP * (advection_x + advection_y + diffusion - decay);
+                double new_value = local_sim.getGrid()[i][j] + TIME_STEP * (-(advection_x + advection_y) + diffusion - decay);
                 temp_grid[i][j] = std::max(0.0, new_value);
             }
         }

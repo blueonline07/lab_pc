@@ -55,7 +55,6 @@ public:
     int getCols() const { return cols; }
 
     // Utility functions
-    void printGrid(int maxRows = 10, int maxCols = 10);
     double getTotalContamination();
 };
 

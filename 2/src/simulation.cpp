@@ -42,14 +42,13 @@ double ContaminationSimulation::computeAdvection(int i, int j)
     double advection_x = 0.0;
     double advection_y = 0.0;
 
-    // Upwind scheme for advection (negative sign for correct physics)
     if (i > 0)
     {
-        advection_x = -WIND_X * (grid[i][j] - grid[i - 1][j]) / DX;
+        advection_x = WIND_X * (grid[i][j] - grid[i - 1][j]) / DX;
     }
     if (j > 0)
     {
-        advection_y = -WIND_Y * (grid[i][j] - grid[i][j - 1]) / DY;
+        advection_y = WIND_Y * (grid[i][j] - grid[i][j - 1]) / DY;
     }
 
     return advection_x + advection_y;
@@ -89,7 +88,7 @@ void ContaminationSimulation::simulateStep()
             double decay = computeDecay(i, j);
 
             // Forward Euler time integration
-            temp_grid[i][j] = grid[i][j] + TIME_STEP * (advection + diffusion - decay);
+            temp_grid[i][j] = grid[i][j] + TIME_STEP * (-advection + diffusion - decay);
 
             // Ensure non-negative concentration
             temp_grid[i][j] = std::max(0.0, temp_grid[i][j]);
@@ -139,20 +138,6 @@ void ContaminationSimulation::printResults()
     {
         for (int j = std::max(0, center_j - half_size);
              j < std::min(cols, center_j + half_size); j++)
-        {
-            std::cout << std::setw(8) << std::fixed << std::setprecision(2)
-                      << grid[i][j] << " ";
-        }
-        std::cout << std::endl;
-    }
-}
-
-void ContaminationSimulation::printGrid(int maxRows, int maxCols)
-{
-    std::cout << "\nGrid (first " << maxRows << "x" << maxCols << "):" << std::endl;
-    for (int i = 0; i < std::min(rows, maxRows); i++)
-    {
-        for (int j = 0; j < std::min(cols, maxCols); j++)
         {
             std::cout << std::setw(8) << std::fixed << std::setprecision(2)
                       << grid[i][j] << " ";
