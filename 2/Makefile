@@ -12,6 +12,7 @@ SIMULATION_OBJ = $(SRC_DIR)/simulation.cpp
 # === Targets ===
 SEQUENTIAL_TARGET = $(BUILD_DIR)/sequential
 PARALLEL_TARGET = $(BUILD_DIR)/parallel
+TEST_TARGET = $(BUILD_DIR)/test_validation
 
 # === Rules ===
 all: $(SEQUENTIAL_TARGET) $(PARALLEL_TARGET)
@@ -25,6 +26,10 @@ $(SEQUENTIAL_TARGET): $(SRC_DIR)/sequential.cpp $(SIMULATION_OBJ)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 $(PARALLEL_TARGET): $(SRC_DIR)/parallel.cpp $(SIMULATION_OBJ)
+	@mkdir -p $(BUILD_DIR)
+	$(MPICXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(TEST_TARGET): $(SRC_DIR)/test_validation.cpp $(SIMULATION_OBJ)
 	@mkdir -p $(BUILD_DIR)
 	$(MPICXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
@@ -45,12 +50,13 @@ run-parallel-8: parallel
 	mpirun -np 8 $(PARALLEL_TARGET)
 
 # === Test targets ===
-test: all
-	@echo "=== Running Sequential Test ==="
-	@time ./$(SEQUENTIAL_TARGET)
-	@echo ""
-	@echo "=== Running Parallel Test (2 processes) ==="
-	@time mpirun -np 2 $(PARALLEL_TARGET)
+test: validate
+
+validate: $(TEST_TARGET)
+	mpirun -np 2 $(TEST_TARGET)
+
+test-4: $(TEST_TARGET)
+	mpirun -np 4 $(TEST_TARGET)
 
 benchmark: all
 	@echo "=== Performance Benchmark ==="
@@ -73,14 +79,16 @@ help:
 	@echo "  all              - Build both sequential and parallel versions"
 	@echo "  sequential       - Build only sequential version"
 	@echo "  parallel         - Build only parallel version"
+	@echo "  test             - Run validation test with 2 processes"
+	@echo "  validate         - Run validation test with 2 processes"
+	@echo "  test-4           - Run validation test with 4 processes"
 	@echo "  run-sequential   - Run sequential simulation"
 	@echo "  run-parallel     - Run parallel simulation with 2 processes"
 	@echo "  run-parallel-2   - Run parallel simulation with 2 processes"
 	@echo "  run-parallel-4   - Run parallel simulation with 4 processes"
 	@echo "  run-parallel-8   - Run parallel simulation with 8 processes"
-	@echo "  test             - Run both versions with timing"
 	@echo "  benchmark        - Performance comparison"
 	@echo "  clean            - Remove build directory"
 	@echo "  help             - Show this help message"
 
-.PHONY: all sequential parallel run-sequential run-parallel run-parallel-2 run-parallel-4 run-parallel-8 test benchmark clean help
+.PHONY: all sequential parallel run-sequential run-parallel run-parallel-2 run-parallel-4 run-parallel-8 test validate test-4 benchmark clean help
