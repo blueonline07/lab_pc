@@ -1,6 +1,4 @@
 #include "simulation.h"
-#include <iostream>
-#include <iomanip>
 
 ContaminationSimulation::ContaminationSimulation(int rows, int cols)
     : rows(rows), cols(cols)
@@ -102,59 +100,4 @@ void ContaminationSimulation::simulateStep()
     applyBoundaryConditions();
 }
 
-int ContaminationSimulation::countUncontaminatedBlocks()
-{
-    int count = 0;
-    for (int i = 0; i < rows; i++)
-    {
-        for (int j = 0; j < cols; j++)
-        {
-            if (grid[i][j] < CONTAMINATION_THRESHOLD)
-            {
-                count++;
-            }
-        }
-    }
-    return count;
-}
-
-void ContaminationSimulation::printResults()
-{
-    std::cout << "\n=== Simulation Results ===" << std::endl;
-    std::cout << "Grid Size: " << rows << "x" << cols << std::endl;
-    std::cout << "Total Blocks: " << rows * cols << std::endl;
-    std::cout << "Uncontaminated Blocks: " << countUncontaminatedBlocks() << std::endl;
-    std::cout << "Total Contamination: " << std::fixed << std::setprecision(6)
-              << getTotalContamination() << std::endl;
-
-    // Print center region
-    std::cout << "\nCenter Region (20x20 around contamination source):" << std::endl;
-    int center_i = INITIAL_X;
-    int center_j = INITIAL_Y;
-    int half_size = 10;
-
-    for (int i = std::max(0, center_i - half_size);
-         i < std::min(rows, center_i + half_size); i++)
-    {
-        for (int j = std::max(0, center_j - half_size);
-             j < std::min(cols, center_j + half_size); j++)
-        {
-            std::cout << std::setw(8) << std::fixed << std::setprecision(2)
-                      << grid[i][j] << " ";
-        }
-        std::cout << std::endl;
-    }
-}
-
-double ContaminationSimulation::getTotalContamination()
-{
-    double total = 0.0;
-    for (int i = 0; i < rows; i++)
-    {
-        for (int j = 0; j < cols; j++)
-        {
-            total += grid[i][j];
-        }
-    }
-    return total;
-}
+// Removed: countUncontaminatedBlocks, printResults, getTotalContamination (unused)

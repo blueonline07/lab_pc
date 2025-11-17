@@ -7,7 +7,7 @@ LDFLAGS   =
 # === Project setup ===
 SRC_DIR = src
 BUILD_DIR = build
-SIMULATION_OBJ = $(SRC_DIR)/simulation.cpp $(SRC_DIR)/utils.cpp
+SIMULATION_OBJ = $(SRC_DIR)/simulation.cpp
 
 # === Targets ===
 SEQUENTIAL_TARGET = $(BUILD_DIR)/sequential
@@ -30,23 +30,18 @@ $(PARALLEL_TARGET): $(SRC_DIR)/parallel.cpp $(SIMULATION_OBJ)
 
 # === Run targets ===
 run-sequential: sequential
-	@echo "Running sequential simulation..."
 	./$(SEQUENTIAL_TARGET)
 
 run-parallel: parallel
-	@echo "Running parallel simulation with 2 processes..."
 	mpirun -np 2 $(PARALLEL_TARGET)
 
 run-parallel-2: parallel
-	@echo "Running parallel simulation with 2 processes..."
 	mpirun -np 2 $(PARALLEL_TARGET)
 
 run-parallel-4: parallel
-	@echo "Running parallel simulation with 4 processes..."
 	mpirun -np 4 $(PARALLEL_TARGET)
 
 run-parallel-8: parallel
-	@echo "Running parallel simulation with 8 processes..."
 	mpirun -np 8 $(PARALLEL_TARGET)
 
 # === Test targets ===

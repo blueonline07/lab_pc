@@ -24,18 +24,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if (rank == 0)
-    {
-        std::cout << "=== Parallel Contamination Diffusion Simulation ===" << std::endl;
-        std::cout << "Number of processes: " << size << std::endl;
-        std::cout << "Grid Size: " << GRID_SIZE << "x" << GRID_SIZE << std::endl;
-        std::cout << "Simulation Time: " << SIMULATION_TIME << " seconds" << std::endl;
-        std::cout << "Wind Velocity: (" << WIND_X << ", " << WIND_Y << ") m/s" << std::endl;
-        std::cout << "Diffusion Coefficient: " << DIFFUSION_COEFF << std::endl;
-        std::cout << "Decay Rate: " << DECAY_RATE << std::endl;
-        std::cout << "Deposition Rate: " << DEPOSITION_RATE << std::endl;
-        std::cout << std::endl;
-    }
+    // Minimal output: suppress banners and configuration prints
 
     // Calculate local grid dimensions
     int local_rows = GRID_SIZE / size;
@@ -53,8 +42,6 @@ int main(int argc, char *argv[])
     {
         global_grid.resize(GRID_SIZE, std::vector<double>(GRID_SIZE, 0.0));
         global_grid[INITIAL_X][INITIAL_Y] = INITIAL_CONTAMINATION;
-
-        std::cout << "Initial contamination at center: " << INITIAL_CONTAMINATION << std::endl;
     }
 
     // Scatter initial grid to all processes
@@ -92,27 +79,7 @@ int main(int argc, char *argv[])
         local_sim.getGrid()[local_rows + 1][j] = 0.0; // Bottom ghost row
     }
 
-    // Count initial uncontaminated blocks (consistent with computation loop)
-    int local_uncontaminated = 0;
-    for (int i = 1; i < local_rows + 1; i++)
-    {
-        for (int j = 0; j < GRID_SIZE; j++)
-        {
-            if (local_sim.getGrid()[i][j] < CONTAMINATION_THRESHOLD)
-            {
-                local_uncontaminated++;
-            }
-        }
-    }
-
-    int global_uncontaminated;
-    MPI_Reduce(&local_uncontaminated, &global_uncontaminated, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-    if (rank == 0)
-    {
-        std::cout << "Initial uncontaminated blocks: " << global_uncontaminated << std::endl;
-        std::cout << std::endl;
-    }
+    // Remove initial uncontaminated counting for minimal output
 
     // Start timing
     double start_time = MPI_Wtime();
@@ -197,106 +164,18 @@ int main(int argc, char *argv[])
         // Synchronize all processes
         MPI_Barrier(MPI_COMM_WORLD);
 
-        // Count uncontaminated blocks (consistent with computation loop)
-        local_uncontaminated = 0;
-        for (int i = 1; i < local_rows + 1; i++)
-        {
-            for (int j = 0; j < GRID_SIZE; j++)
-            {
-                if (local_sim.getGrid()[i][j] < CONTAMINATION_THRESHOLD)
-                {
-                    local_uncontaminated++;
-                }
-            }
-        }
-
-        MPI_Reduce(&local_uncontaminated, &global_uncontaminated, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-        // Report progress every 10 steps
-        if (rank == 0 && (step % 10 == 0 || step == SIMULATION_TIME - 1))
-        {
-            std::cout << "Time Step " << std::setw(3) << step
-                      << ": Uncontaminated blocks = "
-                      << std::setw(8) << global_uncontaminated << std::endl;
-        }
+        // Suppress progress and uncontaminated counting for minimal output
     }
 
     // Calculate total execution time
     double end_time = MPI_Wtime();
     double execution_time = end_time - start_time;
 
-    // Gather final results
-    std::vector<double> gather_buffer;
+    // Minimal output: only print total time from rank 0
     if (rank == 0)
     {
-        gather_buffer.resize(GRID_SIZE * GRID_SIZE);
-    }
-
-    // Prepare local data for gathering (excluding ghost cells)
-    std::vector<double> local_data(local_rows * GRID_SIZE);
-    for (int i = 0; i < local_rows; i++)
-    {
-        for (int j = 0; j < GRID_SIZE; j++)
-        {
-            local_data[i * GRID_SIZE + j] = local_sim.getGrid()[i + 1][j];
-        }
-    }
-
-    MPI_Gather(local_data.data(), local_rows * GRID_SIZE, MPI_DOUBLE,
-               gather_buffer.data(), local_rows * GRID_SIZE, MPI_DOUBLE,
-               0, MPI_COMM_WORLD);
-
-    // Print final results on process 0
-    if (rank == 0)
-    {
-        // Reconstruct global grid
-        for (int i = 0; i < GRID_SIZE; i++)
-        {
-            for (int j = 0; j < GRID_SIZE; j++)
-            {
-                global_grid[i][j] = gather_buffer[i * GRID_SIZE + j];
-            }
-        }
-
-        std::cout << "\n=== Simulation Results ===" << std::endl;
-        std::cout << "Grid Size: " << GRID_SIZE << "x" << GRID_SIZE << std::endl;
-        std::cout << "Total Blocks: " << GRID_SIZE * GRID_SIZE << std::endl;
-        std::cout << "Uncontaminated Blocks: " << global_uncontaminated << std::endl;
-
-        // Calculate total contamination
-        double total_contamination = 0.0;
-        for (int i = 0; i < GRID_SIZE; i++)
-        {
-            for (int j = 0; j < GRID_SIZE; j++)
-            {
-                total_contamination += global_grid[i][j];
-            }
-        }
-        std::cout << "Total Contamination: " << std::fixed << std::setprecision(6)
-                  << total_contamination << std::endl;
-
-        std::cout << "Execution Time: " << std::fixed << std::setprecision(3)
-                  << execution_time << " seconds" << std::endl;
-
-        // Print center region
-        std::cout << "\nCenter Region (20x20 around contamination source):" << std::endl;
-        int center_i = INITIAL_X;
-        int center_j = INITIAL_Y;
-        int half_size = 10;
-
-        for (int i = std::max(0, center_i - half_size);
-             i < std::min(GRID_SIZE, center_i + half_size); i++)
-        {
-            for (int j = std::max(0, center_j - half_size);
-                 j < std::min(GRID_SIZE, center_j + half_size); j++)
-            {
-                std::cout << std::setw(8) << std::fixed << std::setprecision(2)
-                          << global_grid[i][j] << " ";
-            }
-            std::cout << std::endl;
-        }
-
-        std::cout << "\nParallel simulation completed successfully!" << std::endl;
+        std::cout << std::fixed << std::setprecision(3)
+                  << "Parallel: " << execution_time << " s\n";
     }
 
     MPI_Finalize();

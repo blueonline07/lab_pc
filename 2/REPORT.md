@@ -104,7 +104,7 @@ if (rank < size-1) {
 1. **Temporary Grid**: Uses temporary grid for computation to match sequential behavior
 2. **Boundary Conditions**: Applied to actual grid boundaries, not ghost cells
 3. **Loop Bounds**: Consistent with sequential implementation
-4. **Initial Placement**: Contamination placed at (500, 1999) to avoid process boundaries
+4. **Initial Placement**: Contamination placed at the domain center `(2000, 2000)`
 
 ## Performance
 
