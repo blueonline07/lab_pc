@@ -1,0 +1,53 @@
+services:
+  mpi-host-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    hostname: mpi-host-1
+    container_name: mpi-host-1
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    networks:
+      - mpi-network
+    # Start SSH server in background and keep container running
+    command: >
+      sh -c "
+        /usr/sbin/sshd -D &
+        tail -f /dev/null
+      "
+    environment:
+      - OMPI_ALLOW_RUN_AS_ROOT=1
+      - OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+    # Expose SSH port (optional, for debugging)
+    ports:
+      - "2221:22"
+
+  mpi-host-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    hostname: mpi-host-2
+    container_name: mpi-host-2
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    networks:
+      - mpi-network
+    # Start SSH server in background and keep container running
+    command: >
+      sh -c "
+        /usr/sbin/sshd -D &
+        tail -f /dev/null
+      "
+    environment:
+      - OMPI_ALLOW_RUN_AS_ROOT=1
+      - OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+    # Expose SSH port (optional, for debugging)
+    ports:
+      - "2222:22"
+
+networks:
+  mpi-network:
+    driver: bridge
+

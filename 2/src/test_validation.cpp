@@ -31,18 +31,18 @@ std::vector<std::vector<double>> run_parallel(int rank, int size)
     ContaminationSimulation local_sim(local_rows + 2, local_cols);
     std::vector<std::vector<double>> temp_grid(local_rows + 2, std::vector<double>(local_cols, 0.0));
 
-    // Initialize global grid on process 0
+    // Initialize full global grid on process 0 first, then scatter
+    std::vector<double> send_buffer, recv_buffer;
     std::vector<std::vector<double>> global_grid;
     if (rank == 0)
     {
+        // Create and initialize the complete global grid
         global_grid.resize(GRID_SIZE, std::vector<double>(GRID_SIZE, 0.0));
+        
+        // Set initial contamination at the center
         global_grid[INITIAL_X][INITIAL_Y] = INITIAL_CONTAMINATION;
-    }
-
-    // Scatter initial grid
-    std::vector<double> send_buffer, recv_buffer;
-    if (rank == 0)
-    {
+        
+        // Flatten to send buffer
         send_buffer.resize(GRID_SIZE * GRID_SIZE);
         for (int i = 0; i < GRID_SIZE; i++)
         {
@@ -93,7 +93,8 @@ std::vector<std::vector<double>> run_parallel(int rank, int size)
         }
 
         // Compute local update
-        for (int i = 1; i < local_rows; i++)
+        // Update all interior rows (1 to local_rows), boundaries will be overridden later
+        for (int i = 1; i <= local_rows; i++)
         {
             for (int j = 1; j < GRID_SIZE - 1; j++)
             {

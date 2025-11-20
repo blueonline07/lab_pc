@@ -36,18 +36,17 @@ int main(int argc, char *argv[])
     // Create temporary grid for computation (like sequential version)
     std::vector<std::vector<double>> temp_grid(local_rows + 2, std::vector<double>(local_cols, 0.0));
 
-    // Initialize global grid on process 0
-    std::vector<std::vector<double>> global_grid;
-    if (rank == 0)
-    {
-        global_grid.resize(GRID_SIZE, std::vector<double>(GRID_SIZE, 0.0));
-        global_grid[INITIAL_X][INITIAL_Y] = INITIAL_CONTAMINATION;
-    }
-
-    // Scatter initial grid to all processes
+    // Initialize full global grid on process 0 first, then scatter
     std::vector<double> send_buffer, recv_buffer;
     if (rank == 0)
     {
+        // Create and initialize the complete global grid
+        std::vector<std::vector<double>> global_grid(GRID_SIZE, std::vector<double>(GRID_SIZE, 0.0));
+        
+        // Set initial contamination at the center
+        global_grid[INITIAL_X][INITIAL_Y] = INITIAL_CONTAMINATION;
+        
+        // Flatten to send buffer
         send_buffer.resize(GRID_SIZE * GRID_SIZE);
         for (int i = 0; i < GRID_SIZE; i++)
         {
@@ -104,8 +103,9 @@ int main(int argc, char *argv[])
                          MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
 
-        // Compute local update using finite differences (excluding boundaries)
-        for (int i = 1; i < local_rows; i++)
+        // Compute local update using finite differences
+        // Update all interior rows (1 to local_rows), boundaries will be overridden later
+        for (int i = 1; i <= local_rows; i++)
         {
             for (int j = 1; j < GRID_SIZE - 1; j++)
             {

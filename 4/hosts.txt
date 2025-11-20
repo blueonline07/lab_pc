@@ -1,0 +1,7 @@
+# MPI hosts file for multi-host execution
+# Format: hostname slots=N
+# Each line specifies a host and the number of slots (processes) it can run
+
+mpi-host-1 slots=4
+mpi-host-2 slots=0
+
