@@ -13,10 +13,10 @@ SOURCES = main.cpp simulation_task.cpp shock_wave_simulation.cpp task_queue.cpp 
 OBJECTS = $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 HEADERS = $(SRC_DIR)/task.h $(SRC_DIR)/task_queue.h $(SRC_DIR)/worker.h $(SRC_DIR)/simulation_task.h $(SRC_DIR)/shock_wave_simulation.h $(SRC_DIR)/physics_utils.h
 
-# Output executables
+# === Targets ===
 TARGET = $(BUILD_DIR)/shock_simulation
-TEST_TARGET = $(BUILD_DIR)/test_workpool
-PHYSICS_TEST_TARGET = $(BUILD_DIR)/test_physics
+TEST_WORKPOOL_TARGET = $(BUILD_DIR)/test_workpool
+TEST_PHYSICS_TARGET = $(BUILD_DIR)/test_physics
 
 # === Rules ===
 all: $(TARGET)
@@ -29,26 +29,40 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(HEADERS)
 	@mkdir -p $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-test: $(TEST_TARGET) $(PHYSICS_TEST_TARGET)
-
-$(TEST_TARGET): $(SRC_DIR)/test_workpool.cpp $(SRC_DIR)/task_queue.cpp $(HEADERS)
+$(TEST_WORKPOOL_TARGET): $(SRC_DIR)/test_workpool.cpp $(SRC_DIR)/task_queue.cpp $(HEADERS)
 	@mkdir -p $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(SRC_DIR)/test_workpool.cpp $(SRC_DIR)/task_queue.cpp -o $@ $(LDFLAGS)
 
-$(PHYSICS_TEST_TARGET): $(SRC_DIR)/test_physics.cpp $(SRC_DIR)/physics_utils.cpp $(SRC_DIR)/physics_utils.h
+$(TEST_PHYSICS_TARGET): $(SRC_DIR)/test_physics.cpp $(SRC_DIR)/physics_utils.cpp $(SRC_DIR)/physics_utils.h
 	@mkdir -p $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(SRC_DIR)/test_physics.cpp $(SRC_DIR)/physics_utils.cpp -o $@ $(LDFLAGS)
 
-run: all
+# === Run targets ===
+run: $(TARGET)
 	$(TARGET)
 
-run-test: test
-	$(TEST_TARGET)
+# === Test targets ===
+test: test-workpool test-physics
 
-run-physics-test: $(PHYSICS_TEST_TARGET)
-	$(PHYSICS_TEST_TARGET)
+test-workpool: $(TEST_WORKPOOL_TARGET)
+	$(TEST_WORKPOOL_TARGET)
 
+test-physics: $(TEST_PHYSICS_TARGET)
+	$(TEST_PHYSICS_TARGET)
+
+# === Clean ===
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all run clean test run-test run-physics-test
+# === Help ===
+help:
+	@echo "Available targets:"
+	@echo "  all          - Build the main simulation (default)"
+	@echo "  test         - Build and run all tests"
+	@echo "  test-workpool - Build and run workpool tests"
+	@echo "  test-physics - Build and run physics tests"
+	@echo "  run          - Build and run the simulation"
+	@echo "  clean        - Remove build directory"
+	@echo "  help         - Show this help message"
+
+.PHONY: all run test test-workpool test-physics clean help
