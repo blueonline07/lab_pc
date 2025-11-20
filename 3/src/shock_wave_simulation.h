@@ -7,46 +7,50 @@
 #include "worker.h"
 #include "simulation_task.h"
 
-class ShockWaveSimulation {
+class ShockWaveSimulation
+{
 private:
     static const int MAP_SIZE = 4000;
     static const int TIME_STEPS = 100;
-    static constexpr double YIELD = 5000.0; // kilotons
+    static constexpr double YIELD = 5000.0;   // kilotons
     static constexpr double CELL_SIZE = 10.0; // meters
-    
-    double* map;
+
+    double *map;
     std::vector<std::unique_ptr<Worker>> workers;
     int num_threads;
-    
+
 public:
-    ShockWaveSimulation(int num_threads = 4) : num_threads(num_threads) {
+    ShockWaveSimulation(int num_threads = 4) : num_threads(num_threads)
+    {
         map = new double[MAP_SIZE * MAP_SIZE];
         std::fill(map, map + MAP_SIZE * MAP_SIZE, 0.0);
-        
+
         // Create workers
-        for (int i = 0; i < num_threads; i++) {
+        for (int i = 0; i < num_threads; i++)
+        {
             workers.push_back(std::make_unique<Worker>(i));
         }
     }
-    
-    ~ShockWaveSimulation() {
+
+    ~ShockWaveSimulation()
+    {
         // Shutdown workers before cleanup
-        for (auto& worker : workers) {
+        for (auto &worker : workers)
+        {
             worker->exit();
         }
         workers.clear();
         delete[] map;
     }
-    
+
     void runParallelSimulation();
     void runSequentialSimulation();
-    
-    double* getMap() { return map; }
+
+    double *getMap() { return map; }
     int getMapSize() const { return MAP_SIZE; }
-    
-    void printResults();
+
     void resetMap();
-    
+
 private:
     void createTasksForTimeStep(int time_step);
     void waitForCompletion();

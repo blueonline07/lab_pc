@@ -163,8 +163,55 @@ int main(int argc, char *argv[])
 
         // Synchronize all processes
         MPI_Barrier(MPI_COMM_WORLD);
+        // Count uncontaminated blocks (exclude ghost rows and boundaries already zeroed)
+        int local_uncontaminated = 0;
+        for (int i = 1; i <= local_rows; ++i)
+        {
+            for (int j = 1; j < GRID_SIZE - 1; ++j)
+            {
+                double val = local_sim.getGrid()[i][j];
+                if (val < CONTAMINATION_THRESHOLD)
+                {
+                    local_uncontaminated++;
+                }
+            }
+        }
+        int global_uncontaminated = 0;
+        MPI_Reduce(&local_uncontaminated, &global_uncontaminated, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+        if (rank == 0)
+        {
+            std::cout << "Step " << step + 1 << ": uncontaminated blocks = " << global_uncontaminated << '\n';
+        }
+    }
 
-        // Suppress progress and uncontaminated counting for minimal output
+    // Broadcast stop signal after completing iterations (spec requirement)
+    int stop_signal = 1;
+    MPI_Bcast(&stop_signal, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    // Gather final local grids to rank 0 to assemble complete map
+    std::vector<double> gather_buffer; // flattened global map
+    if (rank == 0)
+    {
+        gather_buffer.resize(GRID_SIZE * GRID_SIZE);
+    }
+
+    std::vector<double> local_data(local_rows * GRID_SIZE);
+    for (int i = 0; i < local_rows; ++i)
+    {
+        for (int j = 0; j < GRID_SIZE; ++j)
+        {
+            local_data[i * GRID_SIZE + j] = local_sim.getGrid()[i + 1][j];
+        }
+    }
+
+    MPI_Gather(local_data.data(), local_rows * GRID_SIZE, MPI_DOUBLE,
+               gather_buffer.data(), local_rows * GRID_SIZE, MPI_DOUBLE,
+               0, MPI_COMM_WORLD);
+
+    // Optionally report final uncontaminated blocks (redundant with last step but clearer)
+    if (rank == 0)
+    {
+        std::cout << "Final assembly complete." << std::endl;
     }
 
     // Calculate total execution time

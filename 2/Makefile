@@ -58,6 +58,9 @@ validate: $(TEST_TARGET)
 test-4: $(TEST_TARGET)
 	mpirun -np 4 $(TEST_TARGET)
 
+test-8: $(TEST_TARGET)
+	mpirun -np 8 $(TEST_TARGET)
+
 benchmark: all
 	@echo "=== Performance Benchmark ==="
 	@echo "Sequential version:"
