@@ -6,6 +6,7 @@
 #include <chrono>
 #include "worker.h"
 #include "simulation_task.h"
+#include "task_queue.h"
 
 class ShockWaveSimulation
 {
@@ -34,7 +35,10 @@ public:
 
     ~ShockWaveSimulation()
     {
-        // Shutdown workers before cleanup
+        // Signal TaskQueue to shutdown and wake up all waiting workers
+        TaskQueue::get()->signalShutdown();
+        
+        // Now exit workers (they will receive nullptr from dequeue and exit)
         for (auto &worker : workers)
         {
             worker->exit();

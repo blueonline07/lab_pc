@@ -16,6 +16,7 @@ private:
     std::atomic<int> total_tasks{0};
     std::atomic<bool> shutdown{false};
     static TaskQueue* instance;
+    static std::mutex instance_mutex;
     
 public:
     void enqueue(Task* task) {
@@ -60,9 +61,18 @@ public:
 
     static TaskQueue* get() {
         if (instance == nullptr) {
-            instance = new TaskQueue();
+            std::lock_guard<std::mutex> lock(instance_mutex);
+            if (instance == nullptr) {  // Double-checked locking
+                instance = new TaskQueue();
+            }
         }
         return instance;
+    }
+
+    void resetCounters() {
+        // Only reset the counters, don't touch shutdown or queue
+        completed_tasks.store(0);
+        total_tasks.store(0);
     }
 
     void clear() {

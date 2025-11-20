@@ -1,6 +1,8 @@
+#include <chrono>
 #include <iostream>
-#include <vector>
 #include <memory>
+#include <thread>
+#include <vector>
 #include "task.h"
 #include "task_queue.h"
 #include "worker.h"
@@ -15,6 +17,7 @@ public:
     TestTask(int id, int value) : Task(id), value(value) {}
     void execute() override
     {
+        (void)value;
         // Simulate some work without logging spam
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
@@ -43,6 +46,9 @@ int main()
         std::this_thread::sleep_for(std::chrono::milliseconds(25));
     }
 
+    queue->signalShutdown();
+
     std::cout << "All tasks completed." << std::endl;
     return 0;
 }
+

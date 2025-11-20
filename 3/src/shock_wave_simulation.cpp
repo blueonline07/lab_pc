@@ -8,7 +8,9 @@ void ShockWaveSimulation::runParallelSimulation()
 {
     auto start_time = std::chrono::high_resolution_clock::now();
     TaskQueue *queue = TaskQueue::get();
-    queue->clear();
+    
+    // Reset counters before starting
+    queue->resetCounters();
 
     // Process each time step as a batch to avoid data races on same cell
     for (int time_step = 0; time_step < TIME_STEPS; ++time_step)
@@ -16,7 +18,7 @@ void ShockWaveSimulation::runParallelSimulation()
         createTasksForTimeStep(time_step);
         waitForCompletion();
         // Reset counters for next batch (queue is empty; workers idle waiting)
-        queue->clear();
+        queue->resetCounters();
     }
 
     auto end_time = std::chrono::high_resolution_clock::now();
@@ -83,10 +85,17 @@ void ShockWaveSimulation::waitForCompletion()
 {
     TaskQueue *queue = TaskQueue::get();
     // Efficient wait: poll with small sleep; could be improved with condition signaling
+    int total = queue->getTotalTasks();
     while (!queue->isComplete())
     {
+        // Debug output to see progress
+        if (queue->getCompletedTasks() % 4 == 0) {
+            std::cout << "Progress: " << queue->getCompletedTasks() 
+                      << "/" << total << "\r" << std::flush;
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
+    std::cout << std::string(50, ' ') << "\r" << std::flush; // Clear progress line
 }
 
 void ShockWaveSimulation::resetMap()

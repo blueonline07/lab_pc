@@ -11,7 +11,8 @@ double PhysicsUtils::calculatePeakOverpressure(double distance, double yield_kt)
     double R = distance;
     
     // Calculate scaled distance Z = R * W^(-1/3)
-    double Z = R * std::pow(yield_kt * 1000, -1.0/3.0); // Convert kilotons to kg
+    // 1 kiloton = 1000 tons = 1,000,000 kg
+    double Z = R * std::pow(yield_kt * 1000000.0, -1.0/3.0);
     
     // Calculate u = -0.21436 + 1.35034 * log10(Z)
     double u = -0.21436 + 1.35034 * std::log10(Z);
