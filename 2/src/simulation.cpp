@@ -1,4 +1,7 @@
 #include "simulation.h"
+#include <fstream>
+#include <sstream>
+#include <iostream>
 
 ContaminationSimulation::ContaminationSimulation(int rows, int cols)
     : rows(rows), cols(cols)
@@ -98,6 +101,83 @@ void ContaminationSimulation::simulateStep()
 
     // Apply boundary conditions
     applyBoundaryConditions();
+}
+
+void ContaminationSimulation::saveToCSV(const char* filename) const
+{
+    std::ofstream file(filename);
+    if (!file.is_open())
+    {
+        std::cerr << "Error: Could not open file " << filename << " for writing." << std::endl;
+        return;
+    }
+
+    std::cout << "Writing results to " << filename << "..." << std::flush;
+
+    for (int i = 0; i < rows; i++)
+    {
+        for (int j = 0; j < cols; j++)
+        {
+            file << grid[i][j];
+            if (j < cols - 1) file << ",";
+        }
+        file << "\n";
+    }
+
+    file.close();
+    std::cout << " Done!" << std::endl;
+}
+
+bool ContaminationSimulation::loadFromCSV(const char* filename)
+{
+    std::ifstream file(filename);
+    if (!file.is_open())
+    {
+        std::cerr << "Error: Could not open file " << filename << " for reading." << std::endl;
+        return false;
+    }
+
+    std::cout << "Loading initial conditions from " << filename << "..." << std::flush;
+
+    std::string line;
+    int row = 0;
+
+    while (std::getline(file, line) && row < rows)
+    {
+        std::stringstream ss(line);
+        std::string value;
+        int col = 0;
+
+        while (std::getline(ss, value, ',') && col < cols)
+        {
+            grid[row][col] = std::stod(value);
+            col++;
+        }
+
+        if (col != cols)
+        {
+            std::cerr << "\nError: Row " << row << " has " << col << " columns, expected " << cols << std::endl;
+            file.close();
+            return false;
+        }
+
+        row++;
+    }
+
+    file.close();
+
+    if (row != rows)
+    {
+        std::cerr << "\nError: File has " << row << " rows, expected " << rows << std::endl;
+        return false;
+    }
+
+    std::cout << " Done!" << std::endl;
+    
+    // Apply boundary conditions after loading
+    applyBoundaryConditions();
+    
+    return true;
 }
 
 // Removed: countUncontaminatedBlocks, printResults, getTotalContamination (unused)

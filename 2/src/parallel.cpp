@@ -2,8 +2,10 @@
 #include <mpi.h>
 #include <iostream>
 #include <iomanip>
+#include <fstream>
 #include <vector>
 #include <algorithm>
+#include <string>
 
 int main(int argc, char *argv[])
 {
@@ -11,6 +13,30 @@ int main(int argc, char *argv[])
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+    
+    // Parse command line arguments
+    bool save_output = true;
+    const char* input_file = nullptr;
+    
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        if (arg == "--no-output" || arg == "--skip-csv") {
+            save_output = false;
+        } else if (arg == "--help" || arg == "-h") {
+            if (rank == 0) {
+                std::cout << "Usage: mpirun -np <procs> " << argv[0] << " [options] [input_csv]\n"
+                          << "Options:\n"
+                          << "  --no-output, --skip-csv    Skip CSV output generation\n"
+                          << "  --help, -h                 Show this help message\n"
+                          << "Arguments:\n"
+                          << "  input_csv                  Load initial conditions from CSV file\n";
+            }
+            MPI_Finalize();
+            return 0;
+        } else if (arg[0] != '-') {
+            input_file = argv[i];
+        }
+    }
 
     // Validate that grid size is divisible by number of processes
     if (GRID_SIZE % size != 0)
@@ -41,10 +67,19 @@ int main(int argc, char *argv[])
     if (rank == 0)
     {
         // Create and initialize the complete global grid
-        std::vector<std::vector<double>> global_grid(GRID_SIZE, std::vector<double>(GRID_SIZE, 0.0));
+        ContaminationSimulation global_sim(GRID_SIZE, GRID_SIZE);
         
-        // Set initial contamination at the center
-        global_grid[INITIAL_X][INITIAL_Y] = INITIAL_CONTAMINATION;
+        // Check if CSV input file is provided
+        if (input_file) {
+            // Load from CSV file
+            if (!global_sim.loadFromCSV(input_file)) {
+                std::cerr << "Failed to load input CSV. Using default initialization." << std::endl;
+                global_sim.initialize();
+            }
+        } else {
+            // Use default initialization
+            global_sim.initialize();
+        }
         
         // Flatten to send buffer
         send_buffer.resize(GRID_SIZE * GRID_SIZE);
@@ -52,7 +87,7 @@ int main(int argc, char *argv[])
         {
             for (int j = 0; j < GRID_SIZE; j++)
             {
-                send_buffer[i * GRID_SIZE + j] = global_grid[i][j];
+                send_buffer[i * GRID_SIZE + j] = global_sim.getGrid()[i][j];
             }
         }
     }
@@ -223,6 +258,35 @@ int main(int argc, char *argv[])
     {
         std::cout << std::fixed << std::setprecision(3)
                   << "Parallel: " << execution_time << " s\n";
+        
+        // Save gathered results to CSV (if enabled)
+        if (save_output)
+        {
+            std::ofstream file("lab2_parallel_result.csv");
+            if (file.is_open())
+            {
+                std::cout << "Writing results to lab2_parallel_result.csv..." << std::flush;
+                for (int i = 0; i < GRID_SIZE; i++)
+                {
+                    for (int j = 0; j < GRID_SIZE; j++)
+                    {
+                        file << gather_buffer[i * GRID_SIZE + j];
+                        if (j < GRID_SIZE - 1) file << ",";
+                    }
+                    file << "\n";
+                }
+                file.close();
+                std::cout << " Done!" << std::endl;
+            }
+            else
+            {
+                std::cerr << "Error: Could not open file lab2_parallel_result.csv for writing." << std::endl;
+            }
+        }
+        else
+        {
+            std::cout << "CSV output skipped.\n";
+        }
     }
 
     MPI_Finalize();

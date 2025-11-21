@@ -1,5 +1,7 @@
 #include "heat_diffusion.h"
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -62,4 +64,67 @@ void print_matrix_stats(float* matrix, int size, const char* name) {
     std::cout << "  Min: " << min_val << std::endl;
     std::cout << "  Max: " << max_val << std::endl;
     std::cout << "  Avg: " << avg << std::endl;
+}
+
+void save_matrix_to_csv(float* matrix, const char* filename) {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << " for writing." << std::endl;
+        return;
+    }
+    
+    std::cout << "Writing results to " << filename << "..." << std::flush;
+    
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            file << matrix[i * N + j];
+            if (j < N - 1) file << ",";
+        }
+        file << "\n";
+    }
+    
+    file.close();
+    std::cout << " Done!" << std::endl;
+}
+
+bool load_matrix_from_csv(float* matrix, const char* filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << " for reading." << std::endl;
+        return false;
+    }
+    
+    std::cout << "Loading initial conditions from " << filename << "..." << std::flush;
+    
+    std::string line;
+    int row = 0;
+    
+    while (std::getline(file, line) && row < N) {
+        std::stringstream ss(line);
+        std::string value;
+        int col = 0;
+        
+        while (std::getline(ss, value, ',') && col < N) {
+            matrix[row * N + col] = std::stof(value);
+            col++;
+        }
+        
+        if (col != N) {
+            std::cerr << "\nError: Row " << row << " has " << col << " columns, expected " << N << std::endl;
+            file.close();
+            return false;
+        }
+        
+        row++;
+    }
+    
+    file.close();
+    
+    if (row != N) {
+        std::cerr << "\nError: File has " << row << " rows, expected " << N << std::endl;
+        return false;
+    }
+    
+    std::cout << " Done!" << std::endl;
+    return true;
 }

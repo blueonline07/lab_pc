@@ -2,6 +2,7 @@
 #include "physics_utils.h"
 #include <iostream>
 #include <iomanip>
+#include <fstream>
 #include <thread>
 
 void ShockWaveSimulation::runParallelSimulation()
@@ -101,4 +102,29 @@ void ShockWaveSimulation::waitForCompletion()
 void ShockWaveSimulation::resetMap()
 {
     std::fill(map, map + MAP_SIZE * MAP_SIZE, 0.0);
+}
+
+void ShockWaveSimulation::saveToCSV(const char* filename) const
+{
+    std::ofstream file(filename);
+    if (!file.is_open())
+    {
+        std::cerr << "Error: Could not open file " << filename << " for writing." << std::endl;
+        return;
+    }
+
+    std::cout << "Writing results to " << filename << "..." << std::flush;
+
+    for (int i = 0; i < MAP_SIZE; i++)
+    {
+        for (int j = 0; j < MAP_SIZE; j++)
+        {
+            file << map[i * MAP_SIZE + j];
+            if (j < MAP_SIZE - 1) file << ",";
+        }
+        file << "\n";
+    }
+
+    file.close();
+    std::cout << " Done!" << std::endl;
 }

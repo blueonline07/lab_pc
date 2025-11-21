@@ -45,6 +45,8 @@ public:
     // Core simulation functions
     void initialize();
     void simulateStep();
+    void saveToCSV(const char* filename) const;
+    bool loadFromCSV(const char* filename);
 
     // Accessors for MPI implementation
     std::vector<std::vector<double>> &getGrid() { return grid; }

@@ -49,6 +49,7 @@ public:
 
     void runParallelSimulation();
     void runSequentialSimulation();
+    void saveToCSV(const char* filename) const;
 
     double *getMap() { return map; }
     int getMapSize() const { return MAP_SIZE; }
