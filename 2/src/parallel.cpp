@@ -1,11 +1,11 @@
 #include "simulation.h"
+#include "arg_parser.h"
 #include <mpi.h>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
 #include <vector>
 #include <algorithm>
-#include <string>
 
 int main(int argc, char *argv[])
 {
@@ -14,31 +14,8 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     
-    // Parse command line arguments
-    bool save_output = true;
-    const char* input_file = nullptr;
-    
-    for (int i = 1; i < argc; i++) {
-        std::string arg = argv[i];
-        if (arg == "--no-output" || arg == "--skip-csv") {
-            save_output = false;
-        } else if (arg == "--help" || arg == "-h") {
-            if (rank == 0) {
-                std::cout << "Usage: mpirun -np <procs> " << argv[0] << " [options] [input_csv]\n"
-                          << "Options:\n"
-                          << "  --no-output, --skip-csv    Skip CSV output generation\n"
-                          << "  --help, -h                 Show this help message\n"
-                          << "Arguments:\n"
-                          << "  input_csv                  Load initial conditions from CSV file\n";
-            }
-            MPI_Finalize();
-            return 0;
-        } else if (arg[0] != '-') {
-            input_file = argv[i];
-        }
-    }
+    ProgramOptions opts = parse_arguments(argc, argv, argv[0], true);
 
-    // Validate that grid size is divisible by number of processes
     if (GRID_SIZE % size != 0)
     {
         if (rank == 0)
@@ -50,44 +27,23 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Minimal output: suppress banners and configuration prints
-
-    // Calculate local grid dimensions
     int local_rows = GRID_SIZE / size;
     int local_cols = GRID_SIZE;
 
-    // Create local simulation
-    ContaminationSimulation local_sim(local_rows + 2, local_cols); // +2 for ghost cells
-
-    // Create temporary grid for computation (like sequential version)
+    ContaminationSimulation local_sim(local_rows + 2, local_cols);
     std::vector<std::vector<double>> temp_grid(local_rows + 2, std::vector<double>(local_cols, 0.0));
 
-    // Initialize full global grid on process 0 first, then scatter
     std::vector<double> send_buffer, recv_buffer;
     if (rank == 0)
     {
-        // Create and initialize the complete global grid
         ContaminationSimulation global_sim(GRID_SIZE, GRID_SIZE);
+        global_sim.initializeFromFile(opts.input_file);
         
-        // Check if CSV input file is provided
-        if (input_file) {
-            // Load from CSV file
-            if (!global_sim.loadFromCSV(input_file)) {
-                std::cerr << "Failed to load input CSV. Using default initialization." << std::endl;
-                global_sim.initialize();
-            }
-        } else {
-            // Use default initialization
-            global_sim.initialize();
-        }
-        
-        // Flatten to send buffer
         send_buffer.resize(GRID_SIZE * GRID_SIZE);
-        for (int i = 0; i < GRID_SIZE; i++)
-        {
-            for (int j = 0; j < GRID_SIZE; j++)
-            {
-                send_buffer[i * GRID_SIZE + j] = global_sim.getGrid()[i][j];
+        const auto& grid = global_sim.getGrid();
+        for (int i = 0; i < GRID_SIZE; i++) {
+            for (int j = 0; j < GRID_SIZE; j++) {
+                send_buffer[i * GRID_SIZE + j] = grid[i][j];
             }
         }
     }
@@ -97,7 +53,6 @@ int main(int argc, char *argv[])
                 recv_buffer.data(), local_rows * GRID_SIZE, MPI_DOUBLE,
                 0, MPI_COMM_WORLD);
 
-    // Copy received data to local grid (excluding ghost cells)
     for (int i = 0; i < local_rows; i++)
     {
         for (int j = 0; j < GRID_SIZE; j++)
@@ -106,25 +61,18 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Initialize ghost cells
     for (int j = 0; j < GRID_SIZE; j++)
     {
-        local_sim.getGrid()[0][j] = 0.0;              // Top ghost row
-        local_sim.getGrid()[local_rows + 1][j] = 0.0; // Bottom ghost row
+        local_sim.getGrid()[0][j] = 0.0;
+        local_sim.getGrid()[local_rows + 1][j] = 0.0;
     }
 
-    // Remove initial uncontaminated counting for minimal output
-
-    // Start timing
     double start_time = MPI_Wtime();
 
-    // Run simulation
     for (int step = 0; step < SIMULATION_TIME; step++)
     {
-        // Exchange boundary data with neighboring processes
         if (rank > 0)
         {
-            // Send top row to previous process, receive from previous process
             MPI_Sendrecv(&local_sim.getGrid()[1][0], GRID_SIZE, MPI_DOUBLE, rank - 1, 0,
                          &local_sim.getGrid()[0][0], GRID_SIZE, MPI_DOUBLE, rank - 1, 0,
                          MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -132,14 +80,11 @@ int main(int argc, char *argv[])
 
         if (rank < size - 1)
         {
-            // Send bottom row to next process, receive from next process
             MPI_Sendrecv(&local_sim.getGrid()[local_rows][0], GRID_SIZE, MPI_DOUBLE, rank + 1, 0,
                          &local_sim.getGrid()[local_rows + 1][0], GRID_SIZE, MPI_DOUBLE, rank + 1, 0,
                          MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
 
-        // Compute local update using finite differences
-        // Update all interior rows (1 to local_rows), boundaries will be overridden later
         for (int i = 1; i <= local_rows; i++)
         {
             for (int j = 1; j < GRID_SIZE - 1; j++)
@@ -147,58 +92,50 @@ int main(int argc, char *argv[])
                 double advection_x = 0.0, advection_y = 0.0;
                 double diffusion = 0.0;
 
-                // Advection (upwind scheme with negative sign for correct physics)
-                if (i > 0)
-                {
+                if (i > 0) {
                     advection_x = WIND_X * (local_sim.getGrid()[i][j] - local_sim.getGrid()[i - 1][j]) / DX;
                 }
-                if (j > 0)
-                {
+                if (j > 0) {
                     advection_y = WIND_Y * (local_sim.getGrid()[i][j] - local_sim.getGrid()[i][j - 1]) / DY;
                 }
 
-                // Diffusion (central difference)
-                diffusion = DIFFUSION_COEFF * ((local_sim.getGrid()[i + 1][j] - 2 * local_sim.getGrid()[i][j] + local_sim.getGrid()[i - 1][j]) / (DX * DX) +
-                                               (local_sim.getGrid()[i][j + 1] - 2 * local_sim.getGrid()[i][j] + local_sim.getGrid()[i][j - 1]) / (DY * DY));
+                const auto& g = local_sim.getGrid();
+                diffusion = DIFFUSION_COEFF * (
+                    (g[i + 1][j] - 2 * g[i][j] + g[i - 1][j]) / (DX * DX) +
+                    (g[i][j + 1] - 2 * g[i][j] + g[i][j - 1]) / (DY * DY)
+                );
 
-                // Decay
-                double decay = (DECAY_RATE + DEPOSITION_RATE) * local_sim.getGrid()[i][j];
+                double decay = (DECAY_RATE + DEPOSITION_RATE) * g[i][j];
 
-                // Forward Euler time integration
-                double new_value = local_sim.getGrid()[i][j] + TIME_STEP * (-(advection_x + advection_y) + diffusion - decay);
-                temp_grid[i][j] = std::max(0.0, new_value);
+                temp_grid[i][j] = std::max(0.0, 
+                    g[i][j] + TIME_STEP * (-(advection_x + advection_y) + diffusion - decay));
             }
         }
 
-        // Swap grids (like sequential version)
         local_sim.getGrid().swap(temp_grid);
 
-        // Apply boundary conditions after computation (consistent with sequential version)
         if (rank == 0)
         {
             for (int j = 0; j < GRID_SIZE; j++)
             {
-                local_sim.getGrid()[1][j] = 0.0; // Top boundary (first actual row)
+                local_sim.getGrid()[1][j] = 0.0;
             }
         }
         if (rank == size - 1)
         {
             for (int j = 0; j < GRID_SIZE; j++)
             {
-                local_sim.getGrid()[local_rows][j] = 0.0; // Bottom boundary (last actual row)
+                local_sim.getGrid()[local_rows][j] = 0.0;
             }
         }
 
-        // Apply left and right boundaries
         for (int i = 1; i < local_rows + 1; i++)
         {
-            local_sim.getGrid()[i][0] = 0.0;             // Left boundary
-            local_sim.getGrid()[i][GRID_SIZE - 1] = 0.0; // Right boundary
+            local_sim.getGrid()[i][0] = 0.0;
+            local_sim.getGrid()[i][GRID_SIZE - 1] = 0.0;
         }
 
-        // Synchronize all processes
         MPI_Barrier(MPI_COMM_WORLD);
-        // Count uncontaminated blocks (exclude ghost rows and boundaries already zeroed)
         int local_uncontaminated = 0;
         for (int i = 1; i <= local_rows; ++i)
         {
@@ -219,12 +156,10 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Broadcast stop signal after completing iterations (spec requirement)
     int stop_signal = 1;
     MPI_Bcast(&stop_signal, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    // Gather final local grids to rank 0 to assemble complete map
-    std::vector<double> gather_buffer; // flattened global map
+    std::vector<double> gather_buffer;
     if (rank == 0)
     {
         gather_buffer.resize(GRID_SIZE * GRID_SIZE);
@@ -243,48 +178,34 @@ int main(int argc, char *argv[])
                gather_buffer.data(), local_rows * GRID_SIZE, MPI_DOUBLE,
                0, MPI_COMM_WORLD);
 
-    // Optionally report final uncontaminated blocks (redundant with last step but clearer)
     if (rank == 0)
     {
         std::cout << "Final assembly complete." << std::endl;
     }
 
-    // Calculate total execution time
     double end_time = MPI_Wtime();
     double execution_time = end_time - start_time;
 
-    // Minimal output: only print total time from rank 0
     if (rank == 0)
     {
         std::cout << std::fixed << std::setprecision(3)
                   << "Parallel: " << execution_time << " s\n";
         
-        // Save gathered results to CSV (if enabled)
-        if (save_output)
-        {
+        if (opts.save_output) {
             std::ofstream file("lab2_parallel_result.csv");
-            if (file.is_open())
-            {
+            if (file.is_open()) {
                 std::cout << "Writing results to lab2_parallel_result.csv..." << std::flush;
-                for (int i = 0; i < GRID_SIZE; i++)
-                {
-                    for (int j = 0; j < GRID_SIZE; j++)
-                    {
-                        file << gather_buffer[i * GRID_SIZE + j];
-                        if (j < GRID_SIZE - 1) file << ",";
+                for (int i = 0; i < GRID_SIZE; i++) {
+                    for (int j = 0; j < GRID_SIZE; j++) {
+                        file << gather_buffer[i * GRID_SIZE + j] << (j < GRID_SIZE - 1 ? "," : "");
                     }
                     file << "\n";
                 }
-                file.close();
                 std::cout << " Done!" << std::endl;
-            }
-            else
-            {
+            } else {
                 std::cerr << "Error: Could not open file lab2_parallel_result.csv for writing." << std::endl;
             }
-        }
-        else
-        {
+        } else {
             std::cout << "CSV output skipped.\n";
         }
     }

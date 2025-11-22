@@ -21,13 +21,13 @@ sequential: $(SEQUENTIAL_TARGET)
 
 parallel: $(PARALLEL_TARGET)
 
-$(SEQUENTIAL_TARGET): $(SRC_DIR)/sequential.cpp $(SIMULATION_OBJ)
+$(SEQUENTIAL_TARGET): $(SRC_DIR)/sequential.cpp $(SIMULATION_OBJ) $(SRC_DIR)/arg_parser.cpp
 	@mkdir -p $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
-$(PARALLEL_TARGET): $(SRC_DIR)/parallel.cpp $(SIMULATION_OBJ)
+$(PARALLEL_TARGET): $(SRC_DIR)/parallel.cpp $(SIMULATION_OBJ) $(SRC_DIR)/arg_parser.cpp
 	@mkdir -p $(BUILD_DIR)
-	$(MPICXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+	$(MPICXX) $(CXXFLAGS) -DUSE_MPI $^ -o $@ $(LDFLAGS)
 
 $(TEST_TARGET): $(SRC_DIR)/test_validation.cpp $(SIMULATION_OBJ)
 	@mkdir -p $(BUILD_DIR)

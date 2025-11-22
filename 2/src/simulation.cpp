@@ -6,35 +6,31 @@
 ContaminationSimulation::ContaminationSimulation(int rows, int cols)
     : rows(rows), cols(cols)
 {
-    // Initialize grids with proper dimensions
     grid.resize(rows, std::vector<double>(cols, 0.0));
     temp_grid.resize(rows, std::vector<double>(cols, 0.0));
 }
 
 void ContaminationSimulation::initialize()
 {
-    // Set initial contamination at center of grid
     if (INITIAL_X < rows && INITIAL_Y < cols)
     {
         grid[INITIAL_X][INITIAL_Y] = INITIAL_CONTAMINATION;
     }
 
-    // Apply boundary conditions
     applyBoundaryConditions();
 }
 
 void ContaminationSimulation::applyBoundaryConditions()
 {
-    // Zero padding at boundaries
     for (int i = 0; i < rows; i++)
     {
-        grid[i][0] = 0.0;        // Left boundary
-        grid[i][cols - 1] = 0.0; // Right boundary
+        grid[i][0] = 0.0;
+        grid[i][cols - 1] = 0.0;
     }
     for (int j = 0; j < cols; j++)
     {
-        grid[0][j] = 0.0;        // Top boundary
-        grid[rows - 1][j] = 0.0; // Bottom boundary
+        grid[0][j] = 0.0;
+        grid[rows - 1][j] = 0.0;
     }
 }
 
@@ -59,7 +55,6 @@ double ContaminationSimulation::computeDiffusion(int i, int j)
 {
     double diffusion = 0.0;
 
-    // Central difference scheme for diffusion
     if (i > 0 && i < rows - 1)
     {
         diffusion += DIFFUSION_COEFF * (grid[i + 1][j] - 2 * grid[i][j] + grid[i - 1][j]) / (DX * DX);
@@ -79,7 +74,6 @@ double ContaminationSimulation::computeDecay(int i, int j)
 
 void ContaminationSimulation::simulateStep()
 {
-    // Apply PDE for one time step using finite differences
     for (int i = 1; i < rows - 1; i++)
     {
         for (int j = 1; j < cols - 1; j++)
@@ -88,18 +82,12 @@ void ContaminationSimulation::simulateStep()
             double diffusion = computeDiffusion(i, j);
             double decay = computeDecay(i, j);
 
-            // Forward Euler time integration
             temp_grid[i][j] = grid[i][j] + TIME_STEP * (-advection + diffusion - decay);
-
-            // Ensure non-negative concentration
             temp_grid[i][j] = std::max(0.0, temp_grid[i][j]);
         }
     }
 
-    // Swap grids
     grid.swap(temp_grid);
-
-    // Apply boundary conditions
     applyBoundaryConditions();
 }
 
@@ -174,10 +162,17 @@ bool ContaminationSimulation::loadFromCSV(const char* filename)
 
     std::cout << " Done!" << std::endl;
     
-    // Apply boundary conditions after loading
     applyBoundaryConditions();
     
     return true;
 }
 
-// Removed: countUncontaminatedBlocks, printResults, getTotalContamination (unused)
+void ContaminationSimulation::initializeFromFile(const char* filename) {
+    if (filename && loadFromCSV(filename)) {
+        return;
+    }
+    if (filename) {
+        std::cerr << "Failed to load input CSV. Using default initialization." << std::endl;
+    }
+    initialize();
+}

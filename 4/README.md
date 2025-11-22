@@ -1,141 +1,188 @@
-# Lab 4: Multi-Host MPI with Docker Compose
-
-This lab demonstrates running MPI programs across multiple hosts using Docker Compose.
+# Lab 4: Multi-Host MPI Shock Wave Simulation
 
 ## Overview
 
-The setup includes:
-- A simple MPI program that displays which host each process runs on
-- Docker Compose configuration for multiple MPI hosts
-- `hosts.txt` file for MPI hostfile configuration
+This lab implements a distributed nuclear blast shock wave simulation using MPI across multiple machines. The simulation computes peak overpressure across a 4000×4000 grid as the shock front expands from a 5000 kt detonation center over 100 time steps.
 
-## Prerequisites
+Two execution methods are compared:
+- **Synchronous**: Uses `MPI_Barrier` after each time step (high synchronization overhead)
+- **Asynchronous**: Minimal synchronization, overlapping computation (better performance)
 
-- Docker and Docker Compose installed
-- OpenMPI (for local testing, optional)
+## Physics Model
 
-## Quick Start
+Uses Lab 3's Kingery-Bulmash empirical relationships:
+- Scaled distance: `Z = R · W^(-1/3)`
+- Peak overpressure: `log10(Pso) = Σ c_i · u^i`
+- Arrival time: `t = R / 343` (speed of sound)
 
-### Using Docker Compose (Recommended)
+## Requirements
 
-1. **Start the Docker containers:**
-   ```bash
-   make docker-up
-   ```
-   This will build the Docker images (with SSH server) and start both containers.
+- OpenMPI (or compatible MPI implementation)
+- C++17 compiler
+- SSH access between nodes (for multi-host execution)
 
-2. **Build and run the MPI program:**
-   ```bash
-   make docker-run
-   ```
-   This will automatically:
-   - Set up SSH keys for passwordless access between containers
-   - Build the MPI program
-   - Run it across both hosts
-
-   Or run with different number of processes:
-   ```bash
-   make docker-run-2  # 2 processes
-   make docker-run-4  # 4 processes
-   ```
-
-3. **Stop the containers:**
-   ```bash
-   make docker-down
-   ```
-
-### Manual Docker Commands
+## Build
 
 ```bash
-# Start containers
-docker compose up -d
-
-# Build the program
-docker compose exec mpi-host-1 make
-
-# Run MPI program across hosts
-docker compose exec mpi-host-1 mpirun --allow-run-as-root --hostfile hosts.txt -np 4 build/mpi_multi_host
-
-# Stop containers
-docker compose down
+make
 ```
 
-### Local Testing (without Docker)
+## Usage
 
-If you have OpenMPI installed locally:
+### Local Execution (Single Machine)
 
 ```bash
-# Build
-make
-
-# Run on single host
+# Run with 4 processes
 make run
 
-# Run on multiple hosts (requires SSH access to hosts in hosts.txt)
-make run-multi
+# Run with 8 processes
+mpirun -np 8 ./build/mpi_shock_simulation
 ```
 
-## Configuration
+### Multi-Host Execution
 
-### hosts.txt
-
-The `hosts.txt` file specifies which hosts to use and how many processes each can run:
-
+1. **Configure hosts file** (`hosts.txt`):
 ```
-mpi-host-1 slots=2
-mpi-host-2 slots=2
+node1 slots=4
+node2 slots=4
+node3 slots=4
 ```
 
-This means:
-- `mpi-host-1` can run 2 MPI processes
-- `mpi-host-2` can run 2 MPI processes
-- Total capacity: 4 processes
-
-### docker-compose.yml
-
-The Docker Compose file creates:
-- Two containers: `mpi-host-1` and `mpi-host-2`
-- A shared network: `mpi-network`
-- Shared volume: current directory mounted to `/workspace`
-
-## Expected Output
-
-When running with 4 processes across 2 hosts, you should see:
-
+2. **Run with hostfile**:
+```bash
+mpirun -np 12 --hostfile hosts.txt ./build/mpi_shock_simulation
 ```
-=== MPI Multi-Host Execution ===
-Total processes: 4
---------------------------------
-Process 0 of 4 running on host: mpi-host-1 (MPI name: mpi-host-1)
-Process 1 of 4 running on host: mpi-host-1 (MPI name: mpi-host-1)
-Process 2 of 4 running on host: mpi-host-2 (MPI name: mpi-host-2)
-Process 3 of 4 running on host: mpi-host-2 (MPI name: mpi-host-2)
---------------------------------
-Execution completed successfully!
+
+### Options
+
+```bash
+# Run only synchronous version
+./build/mpi_shock_simulation --sync-only
+
+# Run only asynchronous version
+./build/mpi_shock_simulation --async-only
+
+# Skip CSV output (faster)
+./build/mpi_shock_simulation --no-output
+
+# Show help
+./build/mpi_shock_simulation --help
 ```
+
+## Multi-Host Setup
+
+### SSH Configuration
+
+For password-less execution across nodes:
+
+```bash
+# On each node, generate SSH key
+ssh-keygen
+
+# Distribute public key to all other nodes
+ssh-copy-id user@node1
+ssh-copy-id user@node2
+ssh-copy-id user@node3
+```
+
+### MPI Environment
+
+Ensure OpenMPI is installed on all nodes with consistent versions:
+
+```bash
+# Check MPI installation
+mpirun --version
+which mpirun
+```
+
+## Output Files
+
+- `lab4_synchronous_result.csv` - Results from synchronous execution
+- `lab4_asynchronous_result.csv` - Results from asynchronous execution
+
+Each file contains a 4000×4000 matrix of peak overpressure values (kPa).
+
+## Performance Analysis
+
+The asynchronous version should show better performance due to:
+1. **Reduced synchronization overhead**: No barrier after each time step
+2. **Better CPU utilization**: Processes work independently
+3. **Lower communication cost**: Minimal synchronization points
+
+Expected speedup: 5-20% improvement over synchronous version.
+
+## Simulation Parameters
+
+| Parameter | Value |
+|-----------|-------|
+| Grid Size | 4000×4000 |
+| Cell Size | 10.0 m |
+| Time Steps | 100 |
+| Yield | 5000 kt |
+| Physics Model | Kingery-Bulmash |
+
+## Docker Multi-Node Deployment
+
+For testing multi-node MPI without physical hardware, use Docker containers:
+
+### Quick Start with Docker
+
+```bash
+# Method 1: Using the convenience script (recommended)
+./run-docker.sh
+
+# Method 2: Manual setup
+docker compose up -d --build    # Start 4 containers
+./setup-ssh.sh                  # Configure SSH
+docker compose exec mpi-head bash
+make && mpirun -np 12 --hostfile hosts-docker.txt ./build/mpi_shock_simulation
+```
+
+### Docker Features
+
+- ✅ **4 containers** simulating a distributed cluster (`mpi-head` + 3 worker nodes)
+- ✅ **12 processes** total (3 per container)
+- ✅ **Automatic SSH setup** between nodes
+- ✅ **Shared workspace** mounted in all containers
+- ✅ **Easy scaling** - add more nodes in `docker-compose.yml`
+
+### Docker Commands
+
+```bash
+# Run with custom process count
+./run-docker.sh -np 8
+
+# Run without CSV output
+./run-docker.sh --no-output
+
+# Open shell in head node
+./run-docker.sh --shell
+
+# Check cluster status
+./run-docker.sh --status
+
+# Clean up containers
+./run-docker.sh --clean
+```
+
+**📘 For detailed Docker deployment instructions, see [DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md)**
 
 ## Troubleshooting
 
-### SSH Key Setup (for non-Docker multi-host)
+### "Could not resolve hostname"
+- Check `hosts.txt` has correct hostnames
+- Verify SSH connectivity: `ssh hostname`
 
-If running on real multiple hosts (not Docker), you need SSH access:
+### "Exited with exit code 255"
+- SSH authentication failed
+- Ensure password-less SSH is configured
 
-```bash
-# Generate SSH key if needed
-ssh-keygen -t rsa
+### Different results between runs
+- Results should be identical (deterministic)
+- If different, check MPI version consistency
 
-# Copy to remote hosts
-ssh-copy-id user@host1
-ssh-copy-id user@host2
-```
+## References
 
-### Docker Issues
-
-- **Permission denied**: Make sure Docker is running and you have permissions
-- **Network issues**: Check that containers can communicate: `docker network inspect lab_pc_mpi-network`
-- **Build fails**: Ensure containers are running: `docker-compose ps`
-
-## Make Targets
-
-Run `make help` to see all available targets.
-
+- Lab 3 physics implementation
+- OpenMPI documentation: https://www.open-mpi.org/
+- Kingery-Bulmash blast wave parameters

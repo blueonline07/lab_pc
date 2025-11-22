@@ -13,8 +13,8 @@ class ShockWaveSimulation
 private:
     static const int MAP_SIZE = 4000;
     static const int TIME_STEPS = 100;
-    static constexpr double YIELD = 5000.0;   // kilotons
-    static constexpr double CELL_SIZE = 10.0; // meters
+    static constexpr double YIELD = 5000.0;
+    static constexpr double CELL_SIZE = 10.0;
 
     double *map;
     std::vector<std::unique_ptr<Worker>> workers;
@@ -26,7 +26,6 @@ public:
         map = new double[MAP_SIZE * MAP_SIZE];
         std::fill(map, map + MAP_SIZE * MAP_SIZE, 0.0);
 
-        // Create workers
         for (int i = 0; i < num_threads; i++)
         {
             workers.push_back(std::make_unique<Worker>(i));
@@ -35,10 +34,8 @@ public:
 
     ~ShockWaveSimulation()
     {
-        // Signal TaskQueue to shutdown and wake up all waiting workers
         TaskQueue::get()->signalShutdown();
         
-        // Now exit workers (they will receive nullptr from dequeue and exit)
         for (auto &worker : workers)
         {
             worker->exit();
@@ -47,8 +44,8 @@ public:
         delete[] map;
     }
 
-    void runParallelSimulation();
-    void runSequentialSimulation();
+    void runParallelSimulation(bool save_output = true);
+    void runSequentialSimulation(bool save_output = true);
     void saveToCSV(const char* filename) const;
 
     double *getMap() { return map; }
@@ -61,4 +58,4 @@ private:
     void waitForCompletion();
 };
 
-#endif // SHOCK_WAVE_SIMULATION_H
+#endif

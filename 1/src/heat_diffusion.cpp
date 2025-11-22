@@ -2,13 +2,11 @@
 #include <cstring>
 #include <algorithm>
 
-// Heat diffusion kernel as specified in lab requirements
 const float HEAT_KERNEL[3][3] = {
     {0.05f, 0.1f, 0.05f},
     {0.1f, 0.4f, 0.1f},
     {0.05f, 0.1f, 0.05f}};
 
-// Unified naive implementation: runs sequentially or in parallel based on flag
 static float heat_diffusion_naive(float *input, const float kernel[3][3], int iterations, bool do_parallel)
 {
     double start_time = omp_get_wtime();
@@ -23,7 +21,6 @@ static float heat_diffusion_naive(float *input, const float kernel[3][3], int it
 
     for (int iter = 0; iter < iterations; iter++)
     {
-// Perform convolution (parallelized on demand)
 #pragma omp parallel for collapse(2) schedule(static) if (do_parallel)
         for (int i = 0; i < N; i++)
         {
@@ -77,24 +74,21 @@ float parallel_heat_diffusion(float *input, const float kernel[3][3], int iterat
 
 float parallel_heat_diffusion_tiled(float *input, const float kernel[3][3], int iterations)
 {
-    const int stride = N + 2; // halo padding on all sides
-    const int tile = 64;      // default tile size; can be tuned
+    const int stride = N + 2;
+    const int tile = 64;
 
     double start_time = omp_get_wtime();
 
-    // Allocate halo-padded ping-pong buffers
     float *pad_a = new float[stride * stride];
     float *pad_b = new float[stride * stride];
 
     auto set_halo = [&](float *buf)
     {
-        // Top and bottom rows
         for (int j = 0; j < stride; j++)
         {
             buf[0 * stride + j] = BASELINE_TEMP;
             buf[(stride - 1) * stride + j] = BASELINE_TEMP;
         }
-        // Left and right columns
         for (int i = 0; i < stride; i++)
         {
             buf[i * stride + 0] = BASELINE_TEMP;
@@ -102,7 +96,6 @@ float parallel_heat_diffusion_tiled(float *input, const float kernel[3][3], int 
         }
     };
 
-    // Initialize pad_a from input with halo
     set_halo(pad_a);
     for (int i = 0; i < N; i++)
     {
@@ -116,10 +109,8 @@ float parallel_heat_diffusion_tiled(float *input, const float kernel[3][3], int 
 
     for (int iter = 0; iter < iterations; iter++)
     {
-        // Maintain halo baseline on output before compute
         set_halo(cur_out);
 
-// Tile over the inner N x N domain
 #pragma omp parallel for collapse(2) schedule(static)
         for (int i0 = 0; i0 < N; i0 += tile)
         {
@@ -132,20 +123,16 @@ float parallel_heat_diffusion_tiled(float *input, const float kernel[3][3], int 
                 {
                     for (int j = j0; j < j_max; j++)
                     {
-                        const int ii = i + 1; // offset due to halo
+                        const int ii = i + 1;
                         const int jj = j + 1;
 
-                        // Unrolled 3x3 convolution; no boundary checks
                         float sum = 0.0f;
-                        // Row -1
                         sum += cur_in[(ii - 1) * stride + (jj - 1)] * kernel[0][0];
                         sum += cur_in[(ii - 1) * stride + (jj)] * kernel[0][1];
                         sum += cur_in[(ii - 1) * stride + (jj + 1)] * kernel[0][2];
-                        // Row 0
                         sum += cur_in[(ii)*stride + (jj - 1)] * kernel[1][0];
                         sum += cur_in[(ii)*stride + (jj)] * kernel[1][1];
                         sum += cur_in[(ii)*stride + (jj + 1)] * kernel[1][2];
-                        // Row +1
                         sum += cur_in[(ii + 1) * stride + (jj - 1)] * kernel[2][0];
                         sum += cur_in[(ii + 1) * stride + (jj)] * kernel[2][1];
                         sum += cur_in[(ii + 1) * stride + (jj + 1)] * kernel[2][2];
@@ -156,11 +143,9 @@ float parallel_heat_diffusion_tiled(float *input, const float kernel[3][3], int 
             }
         }
 
-        // Swap buffers
         std::swap(cur_in, cur_out);
     }
 
-    // Copy inner region back to input
     for (int i = 0; i < N; i++)
     {
         const float *src_row = &cur_in[(i + 1) * stride + 1];

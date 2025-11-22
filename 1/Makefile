@@ -8,7 +8,7 @@ SRC_DIR = src
 BUILD_DIR = build
 
 # Source files
-SOURCES = $(SRC_DIR)/main.cpp $(SRC_DIR)/heat_diffusion.cpp $(SRC_DIR)/utils.cpp
+SOURCES = $(SRC_DIR)/main.cpp $(SRC_DIR)/heat_diffusion.cpp $(SRC_DIR)/utils.cpp $(SRC_DIR)/arg_parser.cpp
 OBJECTS = $(SOURCES:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
 TEST_SOURCES = $(SRC_DIR)/test_validation.cpp $(SRC_DIR)/heat_diffusion.cpp $(SRC_DIR)/utils.cpp
 TEST_OBJECTS = $(TEST_SOURCES:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)

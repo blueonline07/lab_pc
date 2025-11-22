@@ -8,17 +8,15 @@
 
 void init_heat_map(float* matrix) {
     int center = N / 2;
-    float max_temp = 1000.0f;  // Peak temperature at epicenter
+    float max_temp = 1000.0f;
     
     for(int i = 0; i < N; i++) {
         for(int j = 0; j < N; j++) {
-            // Calculate distance from center
             float dx = i - center;
             float dy = j - center;
             float dist = sqrt(dx * dx + dy * dy);
             
-            // Gaussian heat distribution: peak at center, decreasing outward
-            float sigma = N * 0.1f;  // Controls spread of heat
+            float sigma = N * 0.1f;
             float temp = BASELINE_TEMP + max_temp * exp(-(dist * dist) / (2 * sigma * sigma));
             
             matrix[i * N + j] = temp;
@@ -77,13 +75,11 @@ void save_matrix_to_csv(float* matrix, const char* filename) {
     
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < N; j++) {
-            file << matrix[i * N + j];
-            if (j < N - 1) file << ",";
+            file << matrix[i * N + j] << (j < N - 1 ? "," : "");
         }
         file << "\n";
     }
     
-    file.close();
     std::cout << " Done!" << std::endl;
 }
 
@@ -127,4 +123,14 @@ bool load_matrix_from_csv(float* matrix, const char* filename) {
     
     std::cout << " Done!" << std::endl;
     return true;
+}
+
+void initialize_matrix(float* matrix, const char* input_file) {
+    if (input_file && load_matrix_from_csv(matrix, input_file)) {
+        return;
+    }
+    if (input_file) {
+        std::cerr << "Failed to load input CSV. Using default initialization." << std::endl;
+    }
+    init_heat_map(matrix);
 }

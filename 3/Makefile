@@ -9,7 +9,7 @@ BUILD_DIR = build
 OBJ_DIR = $(BUILD_DIR)/obj
 
 # Source files
-SOURCES = main.cpp simulation_task.cpp shock_wave_simulation.cpp task_queue.cpp physics_utils.cpp
+SOURCES = main.cpp simulation_task.cpp shock_wave_simulation.cpp task_queue.cpp physics_utils.cpp arg_parser.cpp
 OBJECTS = $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 HEADERS = $(SRC_DIR)/task.h $(SRC_DIR)/task_queue.h $(SRC_DIR)/worker.h $(SRC_DIR)/simulation_task.h $(SRC_DIR)/shock_wave_simulation.h $(SRC_DIR)/physics_utils.h
 

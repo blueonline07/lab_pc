@@ -19,7 +19,6 @@ private:
                 TaskQueue::get()->markComplete();
                 delete task;
             } else {
-                // nullptr indicates shutdown signal
                 break;
             }
         }
@@ -44,4 +43,4 @@ public:
     int getId() const { return id; }
 };
 
-#endif // WORKER_H
+#endif

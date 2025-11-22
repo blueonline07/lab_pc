@@ -5,20 +5,16 @@
 #include <fstream>
 #include <thread>
 
-void ShockWaveSimulation::runParallelSimulation()
+void ShockWaveSimulation::runParallelSimulation(bool save_output)
 {
     auto start_time = std::chrono::high_resolution_clock::now();
     TaskQueue *queue = TaskQueue::get();
     
-    // Reset counters before starting
     queue->resetCounters();
 
-    // Process each time step as a batch to avoid data races on same cell
-    for (int time_step = 0; time_step < TIME_STEPS; ++time_step)
-    {
+    for (int time_step = 0; time_step < TIME_STEPS; ++time_step) {
         createTasksForTimeStep(time_step);
         waitForCompletion();
-        // Reset counters for next batch (queue is empty; workers idle waiting)
         queue->resetCounters();
     }
 
@@ -27,29 +23,24 @@ void ShockWaveSimulation::runParallelSimulation()
 
     std::cout << "Parallel: " << std::fixed << std::setprecision(3)
               << (duration.count() / 1000.0) << " s\n";
+    
+    if (save_output) {
+        saveToCSV("lab3_parallel_result.csv");
+    } else {
+        std::cout << "CSV output skipped for parallel.\n";
+    }
 }
 
-void ShockWaveSimulation::runSequentialSimulation()
+void ShockWaveSimulation::runSequentialSimulation(bool save_output)
 {
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    // Process each time step sequentially
-    for (int time_step = 0; time_step < TIME_STEPS; time_step++)
-    {
-        // Process entire map for this time step
-        for (int row = 0; row < MAP_SIZE; row++)
-        {
-            for (int col = 0; col < MAP_SIZE; col++)
-            {
-                // Calculate distance from center
+    for (int time_step = 0; time_step < TIME_STEPS; time_step++) {
+        for (int row = 0; row < MAP_SIZE; row++) {
+            for (int col = 0; col < MAP_SIZE; col++) {
                 double distance = PhysicsUtils::calculateDistance(row, col, MAP_SIZE, CELL_SIZE);
-
-                // Check if shock has reached this cell
-                if (PhysicsUtils::hasShockReached(distance, time_step))
-                {
-                    // Calculate and store peak overpressure
-                    double overpressure = PhysicsUtils::calculatePeakOverpressure(distance, YIELD);
-                    map[row * MAP_SIZE + col] = overpressure;
+                if (PhysicsUtils::hasShockReached(distance, time_step)) {
+                    map[row * MAP_SIZE + col] = PhysicsUtils::calculatePeakOverpressure(distance, YIELD);
                 }
             }
         }
@@ -60,14 +51,18 @@ void ShockWaveSimulation::runSequentialSimulation()
 
     std::cout << "Sequential: " << std::fixed << std::setprecision(3)
               << (duration.count() / 1000.0) << " s\n";
+    
+    if (save_output) {
+        saveToCSV("lab3_sequential_result.csv");
+    } else {
+        std::cout << "CSV output skipped for sequential.\n";
+    }
 }
 
 void ShockWaveSimulation::createTasksForTimeStep(int time_step)
 {
     TaskQueue *queue = TaskQueue::get();
 
-    // Create more tasks than threads for better load balancing
-    // Use 4x the number of threads for better granularity
     int tasks_per_time_step = num_threads * 4;
     int rows_per_task = MAP_SIZE / tasks_per_time_step;
 
@@ -85,18 +80,16 @@ void ShockWaveSimulation::createTasksForTimeStep(int time_step)
 void ShockWaveSimulation::waitForCompletion()
 {
     TaskQueue *queue = TaskQueue::get();
-    // Efficient wait: poll with small sleep; could be improved with condition signaling
     int total = queue->getTotalTasks();
     while (!queue->isComplete())
     {
-        // Debug output to see progress
         if (queue->getCompletedTasks() % 4 == 0) {
             std::cout << "Progress: " << queue->getCompletedTasks() 
                       << "/" << total << "\r" << std::flush;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
-    std::cout << std::string(50, ' ') << "\r" << std::flush; // Clear progress line
+    std::cout << std::string(50, ' ') << "\r" << std::flush;
 }
 
 void ShockWaveSimulation::resetMap()

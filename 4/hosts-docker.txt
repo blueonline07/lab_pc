@@ -1,0 +1,14 @@
+# MPI Hostfile for Docker Multi-Node Deployment
+# Format: hostname slots=N
+
+# Head node (coordinator + compute)
+mpi-head slots=3
+
+# Worker nodes
+mpi-node-1 slots=3
+mpi-node-2 slots=3
+mpi-node-3 slots=3
+
+# Total: 12 processes across 4 containers
+# This simulates a 4-node cluster
+

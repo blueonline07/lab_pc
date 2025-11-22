@@ -62,7 +62,7 @@ public:
     static TaskQueue* get() {
         if (instance == nullptr) {
             std::lock_guard<std::mutex> lock(instance_mutex);
-            if (instance == nullptr) {  // Double-checked locking
+            if (instance == nullptr) {
                 instance = new TaskQueue();
             }
         }
@@ -70,14 +70,12 @@ public:
     }
 
     void resetCounters() {
-        // Only reset the counters, don't touch shutdown or queue
         completed_tasks.store(0);
         total_tasks.store(0);
     }
 
     void clear() {
         std::lock_guard<std::mutex> lock(mtx);
-        // Clear the queue
         while (!queue.empty()) {
             delete queue.front();
             queue.pop();
@@ -96,4 +94,4 @@ public:
     }
 };
 
-#endif // TASK_QUEUE_H
+#endif
