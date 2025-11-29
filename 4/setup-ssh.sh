@@ -1,103 +1,75 @@
-#!/usr/bin/env bash
-# Setup SSH for passwordless access between MPI hosts in Docker containers
+#!/bin/bash
 
-set -e
+# Script to help set up passwordless SSH for distributed MPI
+# This script generates SSH keys and helps distribute them to other nodes
 
-echo "╔════════════════════════════════════════════════════════════════╗"
-echo "║  Setting up SSH for MPI Multi-Host Communication              ║"
-echo "╚════════════════════════════════════════════════════════════════╝"
+echo "=== Distributed MPI SSH Setup ==="
 echo ""
 
-# Define all hosts
-HOSTS="mpi-head mpi-node-1 mpi-node-2 mpi-node-3"
-
-# Wait for containers to be ready
-echo "⏳ Waiting for containers to be ready..."
-sleep 3
-
-# Generate SSH keys in all containers
-echo ""
-echo "🔑 Generating SSH keys in all containers..."
-for host in $HOSTS; do
-    echo "  - $host"
-    docker compose exec -T $host bash -c "
-        mkdir -p /root/.ssh && 
-        chmod 700 /root/.ssh && 
-        [ ! -f /root/.ssh/id_rsa ] && ssh-keygen -t rsa -b 2048 -f /root/.ssh/id_rsa -N '' || true
-    " 2>/dev/null
-done
-
-# Collect all public keys
-echo ""
-echo "📋 Collecting public keys..."
-ALL_KEYS=$(for host in $HOSTS; do
-    docker compose exec -T $host bash -c "cat /root/.ssh/id_rsa.pub" 2>/dev/null
-done)
-echo "  ✓ Collected all keys"
-
-# Distribute keys to all containers
-echo ""
-echo "🔐 Configuring passwordless SSH access..."
-for host in $HOSTS; do
-    echo "  - Configuring $host"
-    echo "$ALL_KEYS" | docker compose exec -T $host bash -c "
-        cat > /root/.ssh/authorized_keys &&
-        chmod 600 /root/.ssh/authorized_keys
-    " 2>/dev/null
-done
-
-# Add known hosts entries
-echo ""
-echo "🌐 Adding known hosts..."
-for host in $HOSTS; do
-    echo "  - Configuring $host"
-    docker compose exec -T $host bash -c "
-        ssh-keyscan -H $HOSTS 2>/dev/null >> /root/.ssh/known_hosts &&
-        chmod 600 /root/.ssh/known_hosts
-    " 2>/dev/null || true
-done
-
-# Test SSH connections
-echo ""
-echo "🧪 Testing SSH connections..."
-echo "  Testing from mpi-head to all nodes..."
-
-success_count=0
-for host in mpi-node-1 mpi-node-2 mpi-node-3; do
-    if docker compose exec -T mpi-head bash -c "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 root@$host 'echo OK' 2>/dev/null" > /dev/null 2>&1; then
-        echo "    ✓ mpi-head → $host: SUCCESS"
-        success_count=$((success_count + 1))
+# Check if SSH key already exists
+if [ -f ~/.ssh/id_rsa ]; then
+    echo "SSH key already exists at ~/.ssh/id_rsa"
+    read -p "Do you want to generate a new key? (y/n): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Using existing SSH key."
     else
-        echo "    ✗ mpi-head → $host: FAILED (retrying...)"
-        sleep 1
-        if docker compose exec -T mpi-head bash -c "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@$host 'echo OK' 2>/dev/null" > /dev/null 2>&1; then
-            echo "    ✓ mpi-head → $host: SUCCESS (retry)"
-            success_count=$((success_count + 1))
-        else
-            echo "    ✗ mpi-head → $host: FAILED"
-        fi
+        ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
+    fi
+else
+    echo "Generating new SSH key..."
+    ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
+fi
+
+# Read hosts from hosts.txt
+if [ ! -f hosts.txt ]; then
+    echo "Error: hosts.txt not found!"
+    exit 1
+fi
+
+echo ""
+echo "Reading hosts from hosts.txt..."
+echo ""
+
+# Extract non-comment, non-empty lines from hosts.txt
+hosts=$(grep -v '^#' hosts.txt | grep -v '^$' | grep -v '^localhost$')
+
+if [ -z "$hosts" ]; then
+    echo "No remote hosts found in hosts.txt (only localhost)."
+    echo "For single-node testing, SSH setup is not required."
+    exit 0
+fi
+
+echo "Found the following hosts:"
+echo "$hosts"
+echo ""
+
+# Ask for username
+read -p "Enter your username for SSH access (default: $(whoami)): " username
+username=${username:-$(whoami)}
+
+echo ""
+echo "You will need to copy your SSH key to each host."
+echo "For each host, run:"
+echo "  ssh-copy-id $username@<HOST_IP>"
+echo ""
+echo "Or use this script to automate (you'll be prompted for passwords):"
+echo ""
+
+for host in $hosts; do
+    echo "Copying SSH key to $username@$host..."
+    ssh-copy-id "$username@$host" 2>/dev/null
+    if [ $? -eq 0 ]; then
+        echo "✓ Successfully copied key to $host"
+    else
+        echo "✗ Failed to copy key to $host (you may need to do this manually)"
     fi
 done
 
 echo ""
-if [ $success_count -eq 3 ]; then
-    echo "✅ SSH setup complete! All connections working."
-else
-    echo "⚠️  SSH setup complete but some connections failed ($success_count/3 successful)."
-    echo "   Try waiting a few more seconds and test manually:"
-    echo "   docker compose exec mpi-head ssh mpi-node-1 'hostname'"
-fi
-
-echo ""
-echo "╔════════════════════════════════════════════════════════════════╗"
-echo "║  MPI Cluster Ready!                                            ║"
-echo "╚════════════════════════════════════════════════════════════════╝"
-echo ""
-echo "Next steps:"
-echo "  1. Build the program:"
-echo "     docker compose exec mpi-head make"
-echo ""
-echo "  2. Run the MPI simulation:"
-echo "     docker compose exec mpi-head mpirun -np 12 --hostfile hosts-docker.txt ./build/mpi_shock_simulation"
-echo ""
+echo "=== Setup Complete ==="
+echo "Test SSH connection to each host:"
+for host in $hosts; do
+    echo "  ssh $username@$host 'echo Connection successful'"
+done
 

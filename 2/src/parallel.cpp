@@ -1,131 +1,117 @@
 #include "simulation.h"
-
-void simulate(double *grid, int rows_per_process, int rank, int size)
-{
-
-    for (int t = 0; t < SIMULATION_STEPS; t++)
-    {
-        if (rank > 0)
-        {
-            MPI_Sendrecv(
-                &grid[1 * (GRID_SIZE + 2)], GRID_SIZE + 2, MPI_DOUBLE, rank - 1, 0,
-                &grid[0], GRID_SIZE + 2, MPI_DOUBLE, rank - 1, 0,
-                MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        }
-
-        if (rank < size - 1)
-        {
-            int last_data_row = rows_per_process * (GRID_SIZE + 2);
-            int bottom_ghost_row = (rows_per_process + 1) * (GRID_SIZE + 2);
-            MPI_Sendrecv(
-                &grid[last_data_row], GRID_SIZE + 2, MPI_DOUBLE, rank + 1, 1,
-                &grid[bottom_ghost_row], GRID_SIZE + 2, MPI_DOUBLE, rank + 1, 1,
-                MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        }
-
-        for (int i = 1; i <= rows_per_process; i++)
-        {
-            for (int j = 1; j <= GRID_SIZE; j++)
-            {
-                int idx = i * (GRID_SIZE + 2) + j;
-                int up_idx = (i - 1) * (GRID_SIZE + 2) + j;
-                int down_idx = (i + 1) * (GRID_SIZE + 2) + j;
-                int left_idx = i * (GRID_SIZE + 2) + (j - 1);
-                int right_idx = i * (GRID_SIZE + 2) + (j + 1);
-
-                double advection = WIND_X * (grid[idx] - grid[up_idx]) / DX + WIND_Y * (grid[idx] - grid[left_idx]) / DY;
-                double diffusion = DIFFUSION_COEFF * (grid[down_idx] - 2 * grid[idx] + grid[up_idx]) / (DX * DX) + DIFFUSION_COEFF * (grid[right_idx] - 2 * grid[idx] + grid[left_idx]) / (DY * DY);
-                double decay = DECAY_RATE * grid[idx] + DEPOSITION_RATE * grid[idx];
-                grid[idx] = grid[idx] + TIME_STEP * (-advection + diffusion - decay);
-                grid[idx] = std::max(0.0, grid[idx]);
-            }
-        }
-
-        int local_uncontaminated = 0;
-        for (int i = 1; i <= rows_per_process; i++)
-        {
-            for (int j = 1; j <= GRID_SIZE; j++)
-            {
-                int idx = i * (GRID_SIZE + 2) + j;
-                if (grid[idx] < CONTAMINATION_THRESHOLD)
-                {
-                    local_uncontaminated++;
-                }
-            }
-        }
-
-        int total_uncontaminated = 0;
-        MPI_Reduce(&local_uncontaminated, &total_uncontaminated, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-        if (rank == 0)
-        {
-            std::cout << "Iteration " << t << ": " << total_uncontaminated << " uncontaminated blocks" << std::endl;
-        }
-    }
-}
+#include <mpi.h>
 
 int main(int argc, char *argv[])
 {
-    double *grid = new double[(GRID_SIZE + 2) * (GRID_SIZE + 2)];
-    for (int i = 0; i < (GRID_SIZE + 2) * (GRID_SIZE + 2); i++)
+    MPI_Init(&argc, &argv);
+    double t0 = MPI_Wtime();
+    int rank = -1, size = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    double *grid = new double[GRID_SIZE * GRID_SIZE];
+    if (rank == 0)
     {
-        grid[i] = 0.0;
-    }
-    std::ifstream file(argv[1]);
-    if (!file.is_open())
-    {
-        std::cerr << "Failed to open file " << argv[1] << std::endl;
-        return 1;
-    }
-    std::string line;
-    for (int i = 1; i <= GRID_SIZE; i++)
-    {
-        if (!std::getline(file, line))
+        std::ifstream file(argv[1]);
+        if (!file.is_open())
         {
+            std::cerr << "Failed to open file " << argv[1] << std::endl;
             return 1;
         }
-        std::istringstream ss(line);
-        for (int j = 1; j <= GRID_SIZE; j++)
+        std::string line;
+        for (int i = 0; i < GRID_SIZE; i++)
         {
-            std::string token;
-            if (!std::getline(ss, token, ','))
+            if (!std::getline(file, line))
             {
                 return 1;
             }
-            grid[i * (GRID_SIZE + 2) + j] = std::stod(token);
+            std::istringstream ss(line);
+            for (int j = 0; j < GRID_SIZE; j++)
+            {
+                std::string token;
+                if (!std::getline(ss, token, ','))
+                {
+                    return 1;
+                }
+                grid[i * GRID_SIZE + j] = std::stod(token);
+            }
         }
+        file.close();
     }
-    file.close();
 
-    auto start_time = std::chrono::high_resolution_clock::now();
-    MPI_Init(&argc, &argv);
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    int chunk = (GRID_SIZE / size) * GRID_SIZE;
+    double *local = new double[chunk];
+    double *temp = new double[chunk];
 
-    int rows_per_process = GRID_SIZE / size;
+    MPI_Scatter((rank == 0 ? grid : nullptr), chunk, MPI_DOUBLE, local, chunk, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    double *local_grid = new double[(rows_per_process + 2) * (GRID_SIZE + 2)];
-
-    for (int i = 0; i < (rows_per_process + 2) * (GRID_SIZE + 2); i++)
+    for (int t = 0; t < SIMULATION_STEPS; t++)
     {
-        local_grid[i] = 0.0;
+        MPI_Request req[4];
+        int req_count = 0;
+        double *prev = new double[GRID_SIZE];
+        double *next = new double[GRID_SIZE];
+        int uncontaminated = 0;
+        int total_uncontaminated = 0;
+        if (rank != 0)
+            MPI_Irecv(prev, GRID_SIZE, MPI_DOUBLE, rank - 1, 0, MPI_COMM_WORLD, &req[req_count++]);
+        if (rank != size - 1)
+            MPI_Irecv(next, GRID_SIZE, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD, &req[req_count++]);
+
+        if (rank != 0)
+            MPI_Isend(local, GRID_SIZE, MPI_DOUBLE, rank - 1, 0, MPI_COMM_WORLD, &req[req_count++]);
+        if (rank != size - 1)
+            MPI_Isend(&local[(GRID_SIZE / size - 1) * GRID_SIZE], GRID_SIZE, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD, &req[req_count++]);
+
+        MPI_Waitall(req_count, req, MPI_STATUSES_IGNORE);
+        for (int i = 0; i < GRID_SIZE / size; i++)
+        {
+            for (int j = 0; j < GRID_SIZE; j++)
+            {
+                double n, s;
+                if (i > 0)
+                {
+                    n = local[(i - 1) * GRID_SIZE + j];
+                }
+                else
+                {
+                    n = (rank != 0) ? prev[j] : 0.0;
+                }
+
+                if (i < GRID_SIZE / size - 1)
+                {
+                    s = local[(i + 1) * GRID_SIZE + j];
+                }
+                else
+                {
+                    s = (rank != size - 1) ? next[j] : 0.0;
+                }
+
+                double w = j > 0 ? local[i * GRID_SIZE + (j - 1)] : 0;
+                double e = j < GRID_SIZE - 1 ? local[i * GRID_SIZE + (j + 1)] : 0;
+                double cur = local[i * GRID_SIZE + j];
+
+                double advection = WIND_X * (cur - n) / DX + WIND_Y * (cur - w) / DY;
+                double diffusion = DIFFUSION_COEFF * (s - 2 * cur + n) / (DX * DX) + DIFFUSION_COEFF * (e - 2 * cur + w) / (DY * DY);
+                double decay = DECAY_RATE * cur + DEPOSITION_RATE * cur;
+                cur = cur + TIME_STEP * (-advection + diffusion - decay);
+                temp[i * GRID_SIZE + j] = std::max(0.0, cur);
+                if (temp[i * GRID_SIZE + j] == 0)
+                    uncontaminated++;
+            }
+        }
+
+        delete[] prev;
+        delete[] next;
+        std::swap(local, temp);
+        MPI_Reduce(&uncontaminated, &total_uncontaminated, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+        if (rank == 0)
+            std::cout << total_uncontaminated << std::endl;
     }
+    MPI_Gather(local, chunk, MPI_DOUBLE, (rank == 0 ? grid : nullptr), chunk, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    MPI_Scatter(&grid[1 * (GRID_SIZE + 2)], (GRID_SIZE + 2) * rows_per_process, MPI_DOUBLE,
-                &local_grid[1 * (GRID_SIZE + 2)], (GRID_SIZE + 2) * rows_per_process, MPI_DOUBLE,
-                0, MPI_COMM_WORLD);
-
-    simulate(local_grid, rows_per_process, rank, size);
-
-    MPI_Gather(&local_grid[1 * (GRID_SIZE + 2)], (GRID_SIZE + 2) * rows_per_process, MPI_DOUBLE,
-               &grid[1 * (GRID_SIZE + 2)], (GRID_SIZE + 2) * rows_per_process, MPI_DOUBLE,
-               0, MPI_COMM_WORLD);
-
-    delete[] local_grid;
-    auto end_time = std::chrono::high_resolution_clock::now();
-    int duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-    std::cout << "Parallel: " << duration << " ms" << std::endl;
+    delete[] grid;
+    if (rank == 0)
+        std::cout << "Parallel: " << MPI_Wtime() - t0;
     MPI_Finalize();
     return 0;
 }

@@ -1,11 +1,12 @@
-# MPI hosts file for multi-host execution
-# Format: hostname slots=N
-# Each line specifies a host and the number of slots (processes) it can run
+# Hostfile for distributed MPI execution
+# Replace with actual IP addresses or hostnames of your cluster nodes
+# Format: one IP address or hostname per line
+# 
+# Example for multi-node setup:
+# 10.1.11.1
+# 10.1.11.2
+# 10.1.11.3
+#
+# For single-node testing (localhost), uncomment the line below:
+localhost
 
-# For local testing (single machine)
-localhost slots=8
-
-# For multi-host setup (uncomment and modify for actual cluster):
-# mpi-host-1 slots=4
-# mpi-host-2 slots=4
-# mpi-host-3 slots=4

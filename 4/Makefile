@@ -1,69 +1,39 @@
-# === Compiler settings ===
 CXX = mpic++
-CXXFLAGS = -O3 -std=c++17 -Wall -Wextra
+CXXFLAGS = -Wall -O2 -std=c++11
+TARGET = bin/test_mpi
+SRC = src/test_mpi.cpp
+OBJ = bin/obj/test_mpi.o
 
-# === Directories ===
-SRC_DIR = src
-BUILD_DIR = build
+# Create directories if they don't exist
+$(shell mkdir -p bin bin/obj)
 
-# === Source files ===
-SOURCES = $(SRC_DIR)/main.cpp \
-          $(SRC_DIR)/shock_simulation.cpp \
-          $(SRC_DIR)/physics_utils.cpp
+all: $(TARGET)
 
-OBJECTS = $(BUILD_DIR)/main.o \
-          $(BUILD_DIR)/shock_simulation.o \
-          $(BUILD_DIR)/physics_utils.o
+$(TARGET): $(OBJ)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJ)
 
-TARGET = $(BUILD_DIR)/mpi_shock_simulation
+$(OBJ): $(SRC)
+	$(CXX) $(CXXFLAGS) -c $(SRC) -o $(OBJ)
 
-# === Build rules ===
-all: $(BUILD_DIR) $(TARGET)
-
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-
-$(TARGET): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $^ -o $@
-
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-# === Run targets ===
-# Run locally (single machine, multiple processes)
-run: $(TARGET)
-	mpirun -np 4 $(TARGET)
-
-# Run with hostfile (multi-host)
-run-multi: $(TARGET)
-	mpirun -np 8 --hostfile hosts.txt $(TARGET)
-
-# Run synchronous only
-run-sync: $(TARGET)
-	mpirun -np 4 --hostfile hosts.txt $(TARGET) --sync-only
-
-# Run asynchronous only
-run-async: $(TARGET)
-	mpirun -np 4 --hostfile hosts.txt $(TARGET) --async-only
-
-# Run without CSV output
-run-no-output: $(TARGET)
-	mpirun -np 4 --hostfile hosts.txt $(TARGET) --no-output
-
-# === Clean ===
 clean:
-	rm -rf $(BUILD_DIR) *.csv
+	rm -rf bin/
 
-# === Help ===
-help:
-	@echo "Available targets:"
-	@echo "  make           - Build the project"
-	@echo "  make run       - Run locally with 4 processes"
-	@echo "  make run-multi - Run with hostfile (8 processes)"
-	@echo "  make run-sync  - Run synchronous version only"
-	@echo "  make run-async - Run asynchronous version only"
-	@echo "  make run-no-output - Run without CSV output"
-	@echo "  make clean     - Remove build files and CSV outputs"
-	@echo "  make help      - Show this help message"
+run-local:
+	mpirun -np 4 ./$(TARGET)
 
-.PHONY: all run run-multi run-sync run-async run-no-output clean help
+run-distributed:
+	@if [ ! -f hosts.txt ]; then \
+		echo "Error: hosts.txt not found. Please create it first."; \
+		exit 1; \
+	fi
+	mpirun -np $$(grep -v '^#' hosts.txt | grep -v '^$$' | wc -l | tr -d ' ') --hostfile hosts.txt ./$(TARGET)
+
+run-distributed-one-per-node:
+	@if [ ! -f hosts.txt ]; then \
+		echo "Error: hosts.txt not found. Please create it first."; \
+		exit 1; \
+	fi
+	mpirun -np $$(grep -v '^#' hosts.txt | grep -v '^$$' | wc -l | tr -d ' ') --hostfile hosts.txt --map-by ppr:1:node ./$(TARGET)
+
+.PHONY: all clean run-local run-distributed run-distributed-one-per-node
+

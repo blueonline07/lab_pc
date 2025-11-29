@@ -1,5 +1,5 @@
 # === Compiler settings ===
-CXX       = g++
+CXX       = g++-15
 CXXFLAGS  = -O3 -std=c++17 -Wall -Wextra
 LDFLAGS   = -lpthread
 

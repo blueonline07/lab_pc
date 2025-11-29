@@ -1,188 +1,145 @@
-# Lab 4: Multi-Host MPI Shock Wave Simulation
+# Distributed MPI Setup and Test
 
-## Overview
+This is a simple setup for testing distributed MPI execution across multiple nodes.
 
-This lab implements a distributed nuclear blast shock wave simulation using MPI across multiple machines. The simulation computes peak overpressure across a 4000×4000 grid as the shock front expands from a 5000 kt detonation center over 100 time steps.
+## Prerequisites
 
-Two execution methods are compared:
-- **Synchronous**: Uses `MPI_Barrier` after each time step (high synchronization overhead)
-- **Asynchronous**: Minimal synchronization, overlapping computation (better performance)
+1. **OpenMPI installed on all nodes**
+   ```bash
+   # On Ubuntu/Debian
+   sudo apt-get install openmpi-bin openmpi-common libopenmpi-dev
+   
+   # On macOS (using Homebrew)
+   brew install openmpi
+   ```
 
-## Physics Model
+2. **Passwordless SSH configured between nodes** (for multi-node setup)
 
-Uses Lab 3's Kingery-Bulmash empirical relationships:
-- Scaled distance: `Z = R · W^(-1/3)`
-- Peak overpressure: `log10(Pso) = Σ c_i · u^i`
-- Arrival time: `t = R / 343` (speed of sound)
+## Quick Start
 
-## Requirements
+### 1. Single-Node Testing (Localhost)
 
-- OpenMPI (or compatible MPI implementation)
-- C++17 compiler
-- SSH access between nodes (for multi-host execution)
-
-## Build
+For testing on a single machine:
 
 ```bash
+# Compile the test program
 make
+
+# Run with 4 processes on localhost
+make run-local
+
+# Or manually:
+mpirun -np 4 ./bin/test_mpi
 ```
 
-## Usage
+### 2. Multi-Node Setup
 
-### Local Execution (Single Machine)
+#### Step 1: Configure Hosts
+
+Edit `hosts.txt` and add the IP addresses or hostnames of your cluster nodes:
+
+```
+10.1.11.1
+10.1.11.2
+10.1.11.3
+```
+
+#### Step 2: Set Up Passwordless SSH
+
+Run the setup script to help configure SSH:
 
 ```bash
-# Run with 4 processes
-make run
-
-# Run with 8 processes
-mpirun -np 8 ./build/mpi_shock_simulation
+chmod +x setup-ssh.sh
+./setup-ssh.sh
 ```
 
-### Multi-Host Execution
-
-1. **Configure hosts file** (`hosts.txt`):
-```
-node1 slots=4
-node2 slots=4
-node3 slots=4
-```
-
-2. **Run with hostfile**:
-```bash
-mpirun -np 12 --hostfile hosts.txt ./build/mpi_shock_simulation
-```
-
-### Options
+Or manually:
 
 ```bash
-# Run only synchronous version
-./build/mpi_shock_simulation --sync-only
-
-# Run only asynchronous version
-./build/mpi_shock_simulation --async-only
-
-# Skip CSV output (faster)
-./build/mpi_shock_simulation --no-output
-
-# Show help
-./build/mpi_shock_simulation --help
-```
-
-## Multi-Host Setup
-
-### SSH Configuration
-
-For password-less execution across nodes:
-
-```bash
-# On each node, generate SSH key
+# Generate SSH key (if you don't have one)
 ssh-keygen
 
-# Distribute public key to all other nodes
-ssh-copy-id user@node1
-ssh-copy-id user@node2
-ssh-copy-id user@node3
+# Copy SSH key to each node
+ssh-copy-id <USERNAME>@<IP_1>
+ssh-copy-id <USERNAME>@<IP_2>
+ssh-copy-id <USERNAME>@<IP_3>
 ```
 
-### MPI Environment
+Test SSH connection:
+```bash
+ssh <USERNAME>@<IP_1> 'echo Connection successful'
+```
 
-Ensure OpenMPI is installed on all nodes with consistent versions:
+#### Step 3: Distribute Files
+
+**Important**: The source code and executable must be available on all nodes at the same path.
 
 ```bash
-# Check MPI installation
-mpirun --version
-which mpirun
+# Option 1: Use scp to copy files to each node
+for host in $(grep -v '^#' hosts.txt | grep -v '^$'); do
+    scp -r . <USERNAME>@$host:/path/to/same/directory/
+done
+
+# Option 2: Use shared filesystem (NFS, etc.)
 ```
 
-## Output Files
-
-- `lab4_synchronous_result.csv` - Results from synchronous execution
-- `lab4_asynchronous_result.csv` - Results from asynchronous execution
-
-Each file contains a 4000×4000 matrix of peak overpressure values (kPa).
-
-## Performance Analysis
-
-The asynchronous version should show better performance due to:
-1. **Reduced synchronization overhead**: No barrier after each time step
-2. **Better CPU utilization**: Processes work independently
-3. **Lower communication cost**: Minimal synchronization points
-
-Expected speedup: 5-20% improvement over synchronous version.
-
-## Simulation Parameters
-
-| Parameter | Value |
-|-----------|-------|
-| Grid Size | 4000×4000 |
-| Cell Size | 10.0 m |
-| Time Steps | 100 |
-| Yield | 5000 kt |
-| Physics Model | Kingery-Bulmash |
-
-## Docker Multi-Node Deployment
-
-For testing multi-node MPI without physical hardware, use Docker containers:
-
-### Quick Start with Docker
+#### Step 4: Run Distributed MPI
 
 ```bash
-# Method 1: Using the convenience script (recommended)
-./run-docker.sh
+# Compile (on each node or on shared filesystem)
+make
 
-# Method 2: Manual setup
-docker compose up -d --build    # Start 4 containers
-./setup-ssh.sh                  # Configure SSH
-docker compose exec mpi-head bash
-make && mpirun -np 12 --hostfile hosts-docker.txt ./build/mpi_shock_simulation
+# Run with one process per node
+make run-distributed-one-per-node
+
+# Or run with multiple processes (distributed across nodes)
+make run-distributed
+
+# Or manually specify number of processes:
+mpirun -np 4 --hostfile hosts.txt ./bin/test_mpi
+mpirun -np 3 --hostfile hosts.txt --map-by ppr:1:node ./bin/test_mpi
 ```
 
-### Docker Features
+## Test Program
 
-- ✅ **4 containers** simulating a distributed cluster (`mpi-head` + 3 worker nodes)
-- ✅ **12 processes** total (3 per container)
-- ✅ **Automatic SSH setup** between nodes
-- ✅ **Shared workspace** mounted in all containers
-- ✅ **Easy scaling** - add more nodes in `docker-compose.yml`
+The `test_mpi.cpp` program:
+- Prints process rank, total processes, and hostname for each process
+- Performs a simple reduction operation to test MPI communication
+- Verifies the computation is correct
 
-### Docker Commands
+## Makefile Targets
 
-```bash
-# Run with custom process count
-./run-docker.sh -np 8
-
-# Run without CSV output
-./run-docker.sh --no-output
-
-# Open shell in head node
-./run-docker.sh --shell
-
-# Check cluster status
-./run-docker.sh --status
-
-# Clean up containers
-./run-docker.sh --clean
-```
-
-**📘 For detailed Docker deployment instructions, see [DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md)**
+- `make` or `make all`: Compile the test program
+- `make clean`: Remove compiled binaries
+- `make run-local`: Run with 4 processes on localhost
+- `make run-distributed`: Run distributed MPI (one process per node)
+- `make run-distributed-one-per-node`: Run with `--map-by ppr:1:node` option
 
 ## Troubleshooting
 
-### "Could not resolve hostname"
-- Check `hosts.txt` has correct hostnames
-- Verify SSH connectivity: `ssh hostname`
+1. **"Host key verification failed"**
+   - Manually SSH to each host first to accept host keys
+   - Or add hosts to `~/.ssh/known_hosts`
 
-### "Exited with exit code 255"
-- SSH authentication failed
-- Ensure password-less SSH is configured
+2. **"Command not found: mpirun"**
+   - Ensure OpenMPI is installed and in PATH
+   - Try: `which mpirun` or `which mpicc`
 
-### Different results between runs
-- Results should be identical (deterministic)
-- If different, check MPI version consistency
+3. **"Permission denied (publickey)"**
+   - SSH keys not properly distributed
+   - Run `setup-ssh.sh` or manually copy keys
 
-## References
+4. **"No route to host"**
+   - Check network connectivity: `ping <IP>`
+   - Verify firewall settings
 
-- Lab 3 physics implementation
-- OpenMPI documentation: https://www.open-mpi.org/
-- Kingery-Bulmash blast wave parameters
+5. **Executable not found on remote nodes**
+   - Ensure executable is at the same path on all nodes
+   - Use absolute paths in hostfile if needed
+
+## Notes
+
+- For single-node testing, you can use `localhost` in `hosts.txt`
+- The `--map-by ppr:1:node` option ensures exactly one process per node
+- Without this option, MPI may distribute processes unevenly across nodes
+
