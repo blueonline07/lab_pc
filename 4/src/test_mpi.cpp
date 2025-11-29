@@ -6,45 +6,46 @@
 int main(int argc, char** argv) {
     // Initialize MPI
     MPI_Init(&argc, &argv);
-    
-    int rank, size;
+
+    int world_size, world_rank;
     char processor_name[MPI_MAX_PROCESSOR_NAME];
     int name_len;
-    
-    // Get process rank and total number of processes
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    // Get the number of processes
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+    // Get the rank of the process
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+    // Get the name of the processor
     MPI_Get_processor_name(processor_name, &name_len);
-    
-    // Simple computation to verify MPI is working
-    int local_value = rank * 10;
-    int global_sum = 0;
-    
-    // Perform a reduction operation to test communication
-    MPI_Reduce(&local_value, &global_sum, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-    
-    // Print information from each process
-    std::cout << "Process " << rank << " of " << size 
-              << " running on node: " << processor_name 
-              << " (PID: " << getpid() << ")" << std::endl;
-    
-    // Root process prints the result
-    if (rank == 0) {
-        std::cout << "\n=== MPI Test Results ===" << std::endl;
-        std::cout << "Total processes: " << size << std::endl;
-        std::cout << "Sum of all ranks (0 to " << (size-1) << ") * 10 = " 
-                  << global_sum << std::endl;
-        std::cout << "Expected sum: " << (size * (size - 1) / 2 * 10) << std::endl;
-        std::cout << "Test " << (global_sum == (size * (size - 1) / 2 * 10) ? "PASSED" : "FAILED") 
-                  << std::endl;
+
+    // Print a hello world message
+    std::cout << "Hello world from processor " << processor_name 
+              << ", rank " << world_rank 
+              << " out of " << world_size 
+              << " processors" << std::endl;
+
+    // Simple communication test: send and receive
+    if (world_rank == 0) {
+        int number = 42;
+        std::cout << "Process 0 sending number " << number << " to process 1" << std::endl;
+        MPI_Send(&number, 1, MPI_INT, 1, 0, MPI_COMM_WORLD);
+    } else if (world_rank == 1) {
+        int number;
+        MPI_Recv(&number, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        std::cout << "Process 1 received number " << number << " from process 0" << std::endl;
     }
-    
-    // Synchronize all processes
+
+    // Barrier to synchronize all processes
     MPI_Barrier(MPI_COMM_WORLD);
-    
+
+    if (world_rank == 0) {
+        std::cout << "\nAll processes synchronized successfully!" << std::endl;
+    }
+
     // Finalize MPI
     MPI_Finalize();
-    
     return 0;
 }
 

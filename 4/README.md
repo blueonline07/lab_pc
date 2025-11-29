@@ -1,145 +1,79 @@
-# Distributed MPI Setup and Test
+# Distributed MPI Docker Setup
 
-This is a simple setup for testing distributed MPI execution across multiple nodes.
+This setup provides a simple Docker-based environment for running distributed MPI programs across multiple nodes.
 
 ## Prerequisites
 
-1. **OpenMPI installed on all nodes**
-   ```bash
-   # On Ubuntu/Debian
-   sudo apt-get install openmpi-bin openmpi-common libopenmpi-dev
-   
-   # On macOS (using Homebrew)
-   brew install openmpi
-   ```
-
-2. **Passwordless SSH configured between nodes** (for multi-node setup)
+- Docker
+- Docker Compose
 
 ## Quick Start
 
-### 1. Single-Node Testing (Localhost)
+1. **Build and start the containers:**
+   ```bash
+   docker-compose up -d
+   ```
 
-For testing on a single machine:
+2. **Set up passwordless SSH between nodes:**
+   ```bash
+   chmod +x setup-ssh.sh
+   ./setup-ssh.sh
+   ```
 
-```bash
-# Compile the test program
-make
+3. **Run the test MPI program:**
+   ```bash
+   chmod +x run-mpi.sh
+   ./run-mpi.sh 3
+   ```
 
-# Run with 4 processes on localhost
-make run-local
+   This will run the MPI program with 3 processes (1 per node).
 
-# Or manually:
-mpirun -np 4 ./bin/test_mpi
-```
+## Manual Execution
 
-### 2. Multi-Node Setup
-
-#### Step 1: Configure Hosts
-
-Edit `hosts.txt` and add the IP addresses or hostnames of your cluster nodes:
-
-```
-10.1.11.1
-10.1.11.2
-10.1.11.3
-```
-
-#### Step 2: Set Up Passwordless SSH
-
-Run the setup script to help configure SSH:
+You can also run MPI commands manually:
 
 ```bash
-chmod +x setup-ssh.sh
-./setup-ssh.sh
+# Run with 3 processes (1 per node)
+docker exec mpi_node1 mpirun -np 3 --hostfile /app/hosts.txt --map-by ppr:1:node /app/test_mpi
+
+# Run with 2 processes (will use 2 nodes)
+docker exec mpi_node1 mpirun -np 2 --hostfile /app/hosts.txt --map-by ppr:1:node /app/test_mpi
 ```
 
-Or manually:
+## Architecture
 
-```bash
-# Generate SSH key (if you don't have one)
-ssh-keygen
+- **3 Docker containers** (node1, node2, node3) running Ubuntu with OpenMPI
+- **Docker network** with fixed IP addresses (10.1.11.1, 10.1.11.2, 10.1.11.3)
+- **SSH configured** for passwordless access between nodes
+- **Hostfile** (`hosts.txt`) listing all node IPs
 
-# Copy SSH key to each node
-ssh-copy-id <USERNAME>@<IP_1>
-ssh-copy-id <USERNAME>@<IP_2>
-ssh-copy-id <USERNAME>@<IP_3>
-```
+## Files
 
-Test SSH connection:
-```bash
-ssh <USERNAME>@<IP_1> 'echo Connection successful'
-```
-
-#### Step 3: Distribute Files
-
-**Important**: The source code and executable must be available on all nodes at the same path.
-
-```bash
-# Option 1: Use scp to copy files to each node
-for host in $(grep -v '^#' hosts.txt | grep -v '^$'); do
-    scp -r . <USERNAME>@$host:/path/to/same/directory/
-done
-
-# Option 2: Use shared filesystem (NFS, etc.)
-```
-
-#### Step 4: Run Distributed MPI
-
-```bash
-# Compile (on each node or on shared filesystem)
-make
-
-# Run with one process per node
-make run-distributed-one-per-node
-
-# Or run with multiple processes (distributed across nodes)
-make run-distributed
-
-# Or manually specify number of processes:
-mpirun -np 4 --hostfile hosts.txt ./bin/test_mpi
-mpirun -np 3 --hostfile hosts.txt --map-by ppr:1:node ./bin/test_mpi
-```
+- `Dockerfile`: Container image with OpenMPI and SSH
+- `docker-compose.yml`: Multi-node cluster configuration
+- `src/test_mpi.cpp`: Simple MPI test program
+- `Makefile`: Build configuration
+- `hosts.txt`: List of node IP addresses
+- `setup-ssh.sh`: Script to configure passwordless SSH
+- `run-mpi.sh`: Script to execute MPI programs
 
 ## Test Program
 
 The `test_mpi.cpp` program:
-- Prints process rank, total processes, and hostname for each process
-- Performs a simple reduction operation to test MPI communication
-- Verifies the computation is correct
+- Prints hello messages from each MPI process
+- Shows processor name, rank, and total processes
+- Performs a simple send/receive communication test
+- Uses MPI_Barrier for synchronization
 
-## Makefile Targets
+## Cleanup
 
-- `make` or `make all`: Compile the test program
-- `make clean`: Remove compiled binaries
-- `make run-local`: Run with 4 processes on localhost
-- `make run-distributed`: Run distributed MPI (one process per node)
-- `make run-distributed-one-per-node`: Run with `--map-by ppr:1:node` option
+To stop and remove containers:
+```bash
+docker-compose down
+```
 
-## Troubleshooting
-
-1. **"Host key verification failed"**
-   - Manually SSH to each host first to accept host keys
-   - Or add hosts to `~/.ssh/known_hosts`
-
-2. **"Command not found: mpirun"**
-   - Ensure OpenMPI is installed and in PATH
-   - Try: `which mpirun` or `which mpicc`
-
-3. **"Permission denied (publickey)"**
-   - SSH keys not properly distributed
-   - Run `setup-ssh.sh` or manually copy keys
-
-4. **"No route to host"**
-   - Check network connectivity: `ping <IP>`
-   - Verify firewall settings
-
-5. **Executable not found on remote nodes**
-   - Ensure executable is at the same path on all nodes
-   - Use absolute paths in hostfile if needed
-
-## Notes
-
-- For single-node testing, you can use `localhost` in `hosts.txt`
-- The `--map-by ppr:1:node` option ensures exactly one process per node
-- Without this option, MPI may distribute processes unevenly across nodes
+To remove images:
+```bash
+docker-compose down --rmi all
+```
 

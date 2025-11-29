@@ -1,12 +1,4 @@
-# Hostfile for distributed MPI execution
-# Replace with actual IP addresses or hostnames of your cluster nodes
-# Format: one IP address or hostname per line
-# 
-# Example for multi-node setup:
-# 10.1.11.1
-# 10.1.11.2
-# 10.1.11.3
-#
-# For single-node testing (localhost), uncomment the line below:
-localhost
+172.20.0.10
+172.20.0.11
+172.20.0.12
 
