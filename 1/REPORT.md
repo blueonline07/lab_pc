@@ -7,7 +7,7 @@ model the aftermath of a nuclear explosion. The simulation tracks how heat
 spreads through a 4000×4000 matrix over 100 iterations, comparing sequential and
 parallel implementations using OpenMP.
 
-## Implementation Details
+## Implementation
 
 ### Sequential Algorithm
 
@@ -130,5 +130,5 @@ Environment: 8 OpenMP threads
 
 ---
 
-**Report Generated**: October 2025\
+**Report Generated**: December 2025\
 **Simulation Environment**: macOS 14, GCC 15.2, libomp 21.1, OpenMP, 8-core CPU

@@ -8,7 +8,7 @@ simulation models how radioactive contamination spreads through the atmosphere
 under wind conditions, accounting for advection, diffusion, decay, and
 deposition processes.
 
-## Parallelization Strategy
+## Implementation
 
 ### Partition
 
@@ -63,5 +63,5 @@ Efficiency = Speedup / Number of Processes
 
 ---
 
-**Report Generated**: December 2024\
+**Report Generated**: December 2025\
 **Simulation Environment**: macOS ARM64, 8 cores, OpenMPI 5.0.8, GCC 15

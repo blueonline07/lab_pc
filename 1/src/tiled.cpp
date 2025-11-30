@@ -11,13 +11,13 @@ int main(int argc, char *argv[])
         {0.05, 0.1, 0.05},
     };
 
-    double **grid = new double *[GRID_SIZE + 2];
-    double **new_grid = new double *[GRID_SIZE + 2];
-    for (int i = 0; i <= GRID_SIZE + 1; i++)
+    double **grid = new double *[N + 2];
+    double **new_grid = new double *[N + 2];
+    for (int i = 0; i <= N + 1; i++)
     {
-        grid[i] = new double[GRID_SIZE + 2];
-        new_grid[i] = new double[GRID_SIZE + 2];
-        for (int j = 0; j <= GRID_SIZE + 1; j++)
+        grid[i] = new double[N + 2];
+        new_grid[i] = new double[N + 2];
+        for (int j = 0; j <= N + 1; j++)
         {
             grid[i][j] = 30.0;
             new_grid[i][j] = 30.0;
@@ -31,13 +31,13 @@ int main(int argc, char *argv[])
     {
 
 #pragma omp parallel for collapse(2) schedule(static)
-        for (int ti = 1; ti <= GRID_SIZE; ti += TILE_SIZE)
+        for (int ti = 1; ti <= N; ti += TILE_SIZE)
         {
-            for (int tj = 1; tj <= GRID_SIZE; tj += TILE_SIZE)
+            for (int tj = 1; tj <= N; tj += TILE_SIZE)
             {
 
-                int i_end = std::min(ti + TILE_SIZE, GRID_SIZE + 1);
-                int j_end = std::min(tj + TILE_SIZE, GRID_SIZE + 1);
+                int i_end = std::min(ti + TILE_SIZE, N + 1);
+                int j_end = std::min(tj + TILE_SIZE, N + 1);
 
                 for (int i = ti; i < i_end; i++)
                 {
@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
         new_grid = temp;
     }
     std::cout << omp_get_wtime() - t0;
-    for (int i = 0; i <= GRID_SIZE + 1; i++)
+    for (int i = 0; i <= N + 1; i++)
     {
         delete[] grid[i];
         delete[] new_grid[i];

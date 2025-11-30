@@ -9,13 +9,13 @@ int main(int argc, char *argv[])
         {0.05, 0.1, 0.05},
     };
 
-    double **grid = new double *[GRID_SIZE + 2];
-    double **new_grid = new double *[GRID_SIZE + 2];
-    for (int i = 0; i <= GRID_SIZE + 1; i++)
+    double **grid = new double *[N + 2];
+    double **new_grid = new double *[N + 2];
+    for (int i = 0; i <= N + 1; i++)
     {
-        grid[i] = new double[GRID_SIZE + 2];
-        new_grid[i] = new double[GRID_SIZE + 2];
-        for (int j = 0; j <= GRID_SIZE + 1; j++)
+        grid[i] = new double[N + 2];
+        new_grid[i] = new double[N + 2];
+        for (int j = 0; j <= N + 1; j++)
         {
             grid[i][j] = 30.0;
             new_grid[i][j] = 30.0;
@@ -29,9 +29,9 @@ int main(int argc, char *argv[])
     {
 #pragma omp parallel for collapse(2)
 
-        for (int i = 1; i <= GRID_SIZE; i++)
+        for (int i = 1; i <= N; i++)
         {
-            for (int j = 1; j <= GRID_SIZE; j++)
+            for (int j = 1; j <= N; j++)
             {
                 double sum = 0;
                 for (int ki = 0; ki < 3; ki++)

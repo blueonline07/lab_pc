@@ -1,4 +1,4 @@
-#include "simulation.h"
+#include "common.h"
 #include <mpi.h>
 
 int main(int argc, char *argv[])
@@ -8,7 +8,7 @@ int main(int argc, char *argv[])
     int rank = -1, size = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-    double *grid = new double[GRID_SIZE * GRID_SIZE];
+    double *grid = new double[N * N];
     if (rank == 0)
     {
         std::ifstream file(argv[1]);
@@ -18,27 +18,27 @@ int main(int argc, char *argv[])
             return 1;
         }
         std::string line;
-        for (int i = 0; i < GRID_SIZE; i++)
+        for (int i = 0; i < N; i++)
         {
             if (!std::getline(file, line))
             {
                 return 1;
             }
             std::istringstream ss(line);
-            for (int j = 0; j < GRID_SIZE; j++)
+            for (int j = 0; j < N; j++)
             {
                 std::string token;
                 if (!std::getline(ss, token, ','))
                 {
                     return 1;
                 }
-                grid[i * GRID_SIZE + j] = std::stod(token);
+                grid[i * N + j] = std::stod(token);
             }
         }
         file.close();
     }
 
-    int chunk = (GRID_SIZE / size) * GRID_SIZE;
+    int chunk = (N / size) * N;
     double *local = new double[chunk];
     double *temp = new double[chunk];
 
@@ -46,56 +46,68 @@ int main(int argc, char *argv[])
 
     for (int t = 0; t < SIMULATION_STEPS; t++)
     {
-        MPI_Request req[4];
-        int req_count = 0;
-        double *prev = new double[GRID_SIZE];
-        double *next = new double[GRID_SIZE];
+        double *prev = new double[N];
+        double *next = new double[N];
         int uncontaminated = 0;
         int total_uncontaminated = 0;
-        if (rank != 0)
-            MPI_Irecv(prev, GRID_SIZE, MPI_DOUBLE, rank - 1, 0, MPI_COMM_WORLD, &req[req_count++]);
-        if (rank != size - 1)
-            MPI_Irecv(next, GRID_SIZE, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD, &req[req_count++]);
-
-        if (rank != 0)
-            MPI_Isend(local, GRID_SIZE, MPI_DOUBLE, rank - 1, 0, MPI_COMM_WORLD, &req[req_count++]);
-        if (rank != size - 1)
-            MPI_Isend(&local[(GRID_SIZE / size - 1) * GRID_SIZE], GRID_SIZE, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD, &req[req_count++]);
-
-        MPI_Waitall(req_count, req, MPI_STATUSES_IGNORE);
-        for (int i = 0; i < GRID_SIZE / size; i++)
+        if (rank != 0 && rank != size - 1)
         {
-            for (int j = 0; j < GRID_SIZE; j++)
+
+            MPI_Sendrecv(local, N, MPI_DOUBLE, rank - 1, 0,
+                         prev, N, MPI_DOUBLE, rank - 1, 0,
+                         MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+            MPI_Sendrecv(&local[(N / size - 1) * N], N, MPI_DOUBLE, rank + 1, 0,
+                         next, N, MPI_DOUBLE, rank + 1, 0,
+                         MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+        else if (rank == 0)
+        {
+
+            MPI_Sendrecv(&local[(N / size - 1) * N], N, MPI_DOUBLE, rank + 1, 0,
+                         next, N, MPI_DOUBLE, rank + 1, 0,
+                         MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+        else if (rank == size - 1)
+        {
+
+            MPI_Sendrecv(local, N, MPI_DOUBLE, rank - 1, 0,
+                         prev, N, MPI_DOUBLE, rank - 1, 0,
+                         MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+        for (int i = 0; i < N / size; i++)
+        {
+            for (int j = 0; j < N; j++)
             {
                 double n, s;
                 if (i > 0)
                 {
-                    n = local[(i - 1) * GRID_SIZE + j];
+                    n = local[(i - 1) * N + j];
                 }
                 else
                 {
                     n = (rank != 0) ? prev[j] : 0.0;
                 }
 
-                if (i < GRID_SIZE / size - 1)
+                if (i < N / size - 1)
                 {
-                    s = local[(i + 1) * GRID_SIZE + j];
+                    s = local[(i + 1) * N + j];
                 }
                 else
                 {
                     s = (rank != size - 1) ? next[j] : 0.0;
                 }
 
-                double w = j > 0 ? local[i * GRID_SIZE + (j - 1)] : 0;
-                double e = j < GRID_SIZE - 1 ? local[i * GRID_SIZE + (j + 1)] : 0;
-                double cur = local[i * GRID_SIZE + j];
+                double w = j > 0 ? local[i * N + (j - 1)] : 0;
+                double e = j < N - 1 ? local[i * N + (j + 1)] : 0;
+                double cur = local[i * N + j];
 
                 double advection = WIND_X * (cur - n) / DX + WIND_Y * (cur - w) / DY;
                 double diffusion = DIFFUSION_COEFF * (s - 2 * cur + n) / (DX * DX) + DIFFUSION_COEFF * (e - 2 * cur + w) / (DY * DY);
                 double decay = DECAY_RATE * cur + DEPOSITION_RATE * cur;
                 cur = cur + TIME_STEP * (-advection + diffusion - decay);
-                temp[i * GRID_SIZE + j] = std::max(0.0, cur);
-                if (temp[i * GRID_SIZE + j] == 0)
+                temp[i * N + j] = std::max(0.0, cur);
+                if (temp[i * N + j] == 0)
                     uncontaminated++;
             }
         }

@@ -31,8 +31,27 @@ WORKDIR /app
 COPY src/ /app/src/
 COPY Makefile /app/
 
-# Build the MPI program
-RUN make -C /app
+# Build programs from all folders
+# Folder 1: sync
+# Folder 2: async and sync
+# Folder 3: async and sync
+RUN cd /app && \
+    rm -f src/1/*.o src/2/*.o src/3/*.o && \
+    make clean && \
+    make SRCDIR=src/1 TARGET=sync && \
+    mv sync sync_1 && \
+    make clean && \
+    make SRCDIR=src/2 TARGET=async && \
+    mv async async_2 && \
+    make clean && \
+    make SRCDIR=src/2 TARGET=sync && \
+    mv sync sync_2 && \
+    make clean && \
+    make SRCDIR=src/3 TARGET=async && \
+    mv async async_3 && \
+    make clean && \
+    make SRCDIR=src/3 TARGET=sync && \
+    mv sync sync_3
 
 # Expose SSH port
 EXPOSE 22

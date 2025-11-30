@@ -1,4 +1,4 @@
-#include "simulation.h"
+#include "common.h"
 #include <mpi.h>
 
 int main(int argc, char *argv[])

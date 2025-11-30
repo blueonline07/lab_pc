@@ -11,7 +11,7 @@ This setup provides a simple Docker-based environment for running distributed MP
 
 1. **Build and start the containers:**
    ```bash
-   docker-compose up -d
+   docker compose up -d --build
    ```
 
 2. **Set up passwordless SSH between nodes:**
@@ -20,13 +20,31 @@ This setup provides a simple Docker-based environment for running distributed MP
    ./setup-ssh.sh
    ```
 
-3. **Run the test MPI program:**
+3. **Run your MPI program:**
    ```bash
    chmod +x run-mpi.sh
-   ./run-mpi.sh 3
+   # Run from folder 2, async program
+   ./run-mpi.sh 2 async input.csv
+   
+   # Run from folder 2, sync program
+   ./run-mpi.sh 2 sync input.csv
+   
+   # Run from folder 1, sync program (only sync available in folder 1)
+   ./run-mpi.sh 1 sync input.csv
+   
+   # Run from folder 3, sync program (no input file needed)
+   ./run-mpi.sh 3 sync
+   
+   # Run from folder 3, async program (no input file needed)
+   ./run-mpi.sh 3 async
    ```
 
-   This will run the MPI program with 3 processes (1 per node).
+   Usage: `./run-mpi.sh [folder] [program] [input_file]`
+   - `folder`: Source folder to use - 1, 2, or 3 (default: 2)
+   - `program`: Program name - sync or async (default: sync, async available in folders 2 and 3)
+   - `input_file`: Input CSV file (required for folders 1 and 2, ignored for folder 3)
+   - **Note:** Always uses 3 processes (1 per node, fixed)
+   - **Note:** Folder 3 does not require an input file
 
 ## Manual Execution
 

@@ -3,13 +3,13 @@
 
 int main(int argc, char *argv[])
 {
-    double **grid = new double *[GRID_SIZE + 2];
-    double **new_grid = new double *[GRID_SIZE + 2];
-    for (int i = 0; i <= GRID_SIZE + 1; i++)
+    double **grid = new double *[N + 2];
+    double **new_grid = new double *[N + 2];
+    for (int i = 0; i <= N + 1; i++)
     {
-        grid[i] = new double[GRID_SIZE + 2];
-        new_grid[i] = new double[GRID_SIZE + 2];
-        for (int j = 0; j <= GRID_SIZE + 1; j++)
+        grid[i] = new double[N + 2];
+        new_grid[i] = new double[N + 2];
+        for (int j = 0; j <= N + 1; j++)
         {
             grid[i][j] = 0.0;
             new_grid[i][j] = 0.0;
@@ -23,14 +23,14 @@ int main(int argc, char *argv[])
         return 1;
     }
     std::string line;
-    for (int i = 1; i <= GRID_SIZE; i++)
+    for (int i = 1; i <= N; i++)
     {
         if (!std::getline(file, line))
         {
             return 1;
         }
         std::istringstream ss(line);
-        for (int j = 1; j <= GRID_SIZE; j++)
+        for (int j = 1; j <= N; j++)
         {
             std::string token;
             if (!std::getline(ss, token, ','))
@@ -47,9 +47,9 @@ int main(int argc, char *argv[])
     {
         int total_uncontaminated = 0;
 
-        for (int i = 1; i <= GRID_SIZE; i++)
+        for (int i = 1; i <= N; i++)
         {
-            for (int j = 1; j <= GRID_SIZE; j++)
+            for (int j = 1; j <= N; j++)
             {
                 double advection = WIND_X * (grid[i][j] - grid[i - 1][j]) / DX + WIND_Y * (grid[i][j] - grid[i][j - 1]) / DY;
                 double diffusion = DIFFUSION_COEFF * (grid[i + 1][j] - 2 * grid[i][j] + grid[i - 1][j]) / (DX * DX) + DIFFUSION_COEFF * (grid[i][j + 1] - 2 * grid[i][j] + grid[i][j - 1]) / (DY * DY);
@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
     auto end = std::chrono::high_resolution_clock::now();
     std::cout << "Sequential: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
 
-    for (int i = 0; i <= GRID_SIZE + 1; i++)
+    for (int i = 0; i <= N + 1; i++)
     {
         delete[] grid[i];
     }

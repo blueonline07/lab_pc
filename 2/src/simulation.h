@@ -9,7 +9,7 @@
 
 constexpr int MPI_SIZE = 4;
 
-constexpr int GRID_SIZE = 4000;
+constexpr int N = 4000;
 constexpr double DX = 10.0;
 constexpr double DY = 10.0;
 constexpr int SIMULATION_TIME = 100;
@@ -23,6 +23,6 @@ constexpr double WIND_X = 3.3;
 constexpr double WIND_Y = 1.4;
 
 constexpr double INITIAL_CONTAMINATION = 1000.0;
-constexpr int INITIAL_X = GRID_SIZE / 2;
-constexpr int INITIAL_Y = GRID_SIZE / 2;
+constexpr int INITIAL_X = N / 2;
+constexpr int INITIAL_Y = N / 2;
 #endif
