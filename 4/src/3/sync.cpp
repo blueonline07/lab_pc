@@ -1,7 +1,4 @@
 #include "common.h"
-#include <mpi.h>
-#include <chrono>
-#include <cmath>
 
 int sq(int x)
 {
@@ -15,7 +12,7 @@ int main(int argc, char *argv[])
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-
+    MPI_Barrier(MPI_COMM_WORLD);
     const double c[9] = {2.611369, -1.690128, 0.00805, 0.336743, -0.005162, -0.080923, -0.004785, 0.007930, 0.000768};
 
     int rows_per_proc = N / size;
@@ -44,7 +41,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    auto start = std::chrono::high_resolution_clock::now();
+    double start = MPI_Wtime();
 
     for (int t = 0; t < TIME; t++)
     {
@@ -106,12 +103,10 @@ int main(int argc, char *argv[])
         }
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
-
     if (rank == 0)
     {
         std::cout << "Synchronous MPI Time: "
-                  << std::chrono::duration_cast<std::chrono::seconds>(end - start).count()
+                  << MPI_Wtime() - start
                   << " seconds" << std::endl;
     }
 

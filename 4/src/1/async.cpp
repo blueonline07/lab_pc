@@ -1,6 +1,4 @@
 #include "common.h"
-#include <mpi.h>
-#include <chrono>
 
 int main(int argc, char *argv[])
 {

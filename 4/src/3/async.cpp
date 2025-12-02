@@ -1,8 +1,4 @@
 #include "common.h"
-#include <mpi.h>
-#include <chrono>
-#include <cmath>
-#include <vector>
 
 int sq(int x)
 {
@@ -52,7 +48,7 @@ int main(int argc, char *argv[])
         requests.resize(size * local_rows);
     }
 
-    auto start = std::chrono::high_resolution_clock::now();
+    double start = MPI_Wtime();
 
     // Simulate TIME steps
     for (int t = 0; t < TIME; t++)
@@ -128,12 +124,10 @@ int main(int argc, char *argv[])
         MPI_Waitall(local_rows, send_requests.data(), MPI_STATUSES_IGNORE);
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
-
     if (rank == 0)
     {
         std::cout << "Asynchronous MPI Time: "
-                  << std::chrono::duration_cast<std::chrono::seconds>(end - start).count()
+                  << MPI_Wtime() - start
                   << " seconds" << std::endl;
     }
 

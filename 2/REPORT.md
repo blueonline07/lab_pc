@@ -10,6 +10,8 @@ deposition processes.
 
 ## Implementation
 
+The parallel algorithm employs a domain decomposition strategy to distribute the computational grid across multiple MPI processes. Each process handles a contiguous chunk of the grid, computing finite difference updates for its local portion. The algorithm uses asynchronous communication to exchange boundary data between neighboring processes, allowing computation and communication to overlap. This approach minimizes communication overhead while maintaining the correctness of the stencil-based computation, where each grid point depends on its neighbors. The parallel implementation scales the simulation across multiple processes, significantly reducing execution time for large grid sizes.
+
 ### Partition
 
 ```cpp

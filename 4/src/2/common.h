@@ -6,6 +6,7 @@
 #include <iostream>
 #include <vector>
 #include <cstring>
+#include <mpi.h>
 
 constexpr int MPI_SIZE = 4;
 

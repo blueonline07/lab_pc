@@ -1,5 +1,4 @@
 #include "common.h"
-#include <mpi.h>
 
 int main(int argc, char *argv[])
 {
@@ -8,6 +7,7 @@ int main(int argc, char *argv[])
     int rank = -1, size = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Barrier(MPI_COMM_WORLD);
     double *grid = new double[N * N];
     if (rank == 0)
     {
@@ -118,6 +118,7 @@ int main(int argc, char *argv[])
         MPI_Reduce(&uncontaminated, &total_uncontaminated, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
         if (rank == 0)
             std::cout << total_uncontaminated << std::endl;
+        MPI_Barrier(MPI_COMM_WORLD);
     }
     MPI_Gather(local, chunk, MPI_DOUBLE, (rank == 0 ? grid : nullptr), chunk, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 

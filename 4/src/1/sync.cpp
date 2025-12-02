@@ -1,6 +1,5 @@
 #include "common.h"
 #include <mpi.h>
-#include <chrono>
 
 int main(int argc, char *argv[])
 {
@@ -9,6 +8,7 @@ int main(int argc, char *argv[])
     int rank = -1, size = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Barrier(MPI_COMM_WORLD);
     double k[3][3] = {
         {0.05, 0.1, 0.05},
         {0.1, 0.4, 0.1},
@@ -147,6 +147,7 @@ int main(int argc, char *argv[])
         delete[] prev;
         delete[] next;
         std::swap(local, temp);
+        MPI_Barrier(MPI_COMM_WORLD);
     }
     MPI_Gather(local, chunk, MPI_DOUBLE, (rank == 0 ? grid : nullptr), chunk, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 

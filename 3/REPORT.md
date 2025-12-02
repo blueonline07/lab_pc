@@ -9,7 +9,33 @@ from the detonation center.
 
 ## Implementation
 
-Using threadpool model in Lab 3 instruction.
+The parallel implementation uses a thread pool model with a shared task queue. The algorithm parallelizes the computation by distributing time steps across multiple worker threads. Each time step is packaged as a task and enqueued for parallel processing. Worker threads continuously dequeue tasks and process the entire grid for their assigned time step. The task queue uses mutexes and condition variables to ensure thread-safe access, allowing multiple workers to process different time steps concurrently without race conditions.
+
+### Parallel Algorithm (Thread Pool)
+
+```cpp
+// Main thread enqueues tasks
+for (int t = 0; t < TIME; t++)
+{
+    taskQueue.enqueue(new Task(t, grid, c));
+}
+
+// Worker thread processes tasks
+void run() {
+    while (true) {
+        Task *task = taskQueue->dequeue();
+        if (task == nullptr) break;
+        
+        // Process entire grid for time step t
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                // Same computation logic as sequential
+            }
+        }
+        delete task;
+    }
+}
+```
 
 ## Performance
 

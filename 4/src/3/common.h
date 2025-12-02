@@ -1,5 +1,8 @@
 #include <iostream>
 #include <cmath>
+#include <mpi.h>
+#include <vector>
+#include <cmath>
 
 constexpr int TIME = 100;
 constexpr int N = 4000;
