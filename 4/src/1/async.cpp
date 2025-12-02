@@ -1,113 +1,147 @@
 #include "common.h"
 #include <mpi.h>
-#include <vector>
+#include <chrono>
 
 int main(int argc, char *argv[])
 {
-    MPI_Init(&argc, &argv);
 
-    int rank, size;
+    MPI_Init(&argc, &argv);
+    double t0 = MPI_Wtime();
+    int rank = -1, size = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    double kernel[3][3] = {
+    double k[3][3] = {
         {0.05, 0.1, 0.05},
         {0.1, 0.4, 0.1},
         {0.05, 0.1, 0.05},
     };
-
-    double **grid = new double *[N + 2];
-    double **new_grid = new double *[N + 2];
-    for (int i = 0; i <= N + 1; i++)
-    {
-        grid[i] = new double[N + 2];
-        new_grid[i] = new double[N + 2];
-        for (int j = 0; j <= N + 1; j++)
-        {
-            grid[i][j] = 0.0;
-            new_grid[i][j] = 0.0;
-        }
-    }
-
-    // Only rank 0 reads the file
+    double *grid = new double[N * N];
     if (rank == 0)
     {
-        if (!read_file(grid, argv[1]))
+        std::ifstream file(argv[1]);
+        if (!file.is_open())
         {
-            MPI_Abort(MPI_COMM_WORLD, 1);
+            std::cerr << "Failed to open file " << argv[1] << std::endl;
             return 1;
         }
+        std::string line;
+        for (int i = 0; i < N; i++)
+        {
+            if (!std::getline(file, line))
+            {
+                return 1;
+            }
+            std::istringstream ss(line);
+            for (int j = 0; j < N; j++)
+            {
+                std::string token;
+                if (!std::getline(ss, token, ','))
+                {
+                    return 1;
+                }
+                grid[i * N + j] = std::stod(token);
+            }
+        }
+        file.close();
     }
 
-    double t0 = MPI_Wtime();
-    // Broadcast grid to all processes
-    for (int i = 0; i <= N + 1; i++)
-    {
-        MPI_Bcast(grid[i], N + 2, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    }
+    int chunk = (N / size) * N;
+    double *local = new double[chunk];
+    double *temp = new double[chunk];
 
-    std::vector<MPI_Request> requests;
+    MPI_Scatter((rank == 0 ? grid : nullptr), chunk, MPI_DOUBLE, local, chunk, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     for (int t = 0; t < NUM_ITERS; t++)
     {
-        requests.clear();
+        MPI_Request req[4];
+        int req_count = 0;
+        double *prev = new double[N];
+        double *next = new double[N];
+        if (rank != 0)
+            MPI_Irecv(prev, N, MPI_DOUBLE, rank - 1, 0, MPI_COMM_WORLD, &req[req_count++]);
+        if (rank != size - 1)
+            MPI_Irecv(next, N, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD, &req[req_count++]);
 
-        // Compute this process's rows
-        for (int i = 1 + rank; i <= N; i += size)
+        if (rank != 0)
+            MPI_Isend(local, N, MPI_DOUBLE, rank - 1, 0, MPI_COMM_WORLD, &req[req_count++]);
+        if (rank != size - 1)
+            MPI_Isend(&local[(N / size - 1) * N], N, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD, &req[req_count++]);
+
+        MPI_Waitall(req_count, req, MPI_STATUSES_IGNORE);
+        for (int i = 0; i < N / size; i++)
         {
-            for (int j = 1; j <= N; j++)
+            for (int j = 0; j < N; j++)
             {
-                double sum = 0;
-                for (int ki = 0; ki < 3; ki++)
+                double n, s, ne, nw, se, sw;
+                if (i > 0)
                 {
-                    for (int kj = 0; kj < 3; kj++)
-                    {
-                        int ni = i + ki - 1;
-                        int nj = j + kj - 1;
-                        sum += grid[ni][nj] * kernel[ki][kj];
-                    }
+                    n = local[(i - 1) * N + j];
                 }
-                new_grid[i][j] = sum;
-            }
+                else
+                {
+                    n = (rank != 0) ? prev[j] : 30.0;
+                }
 
-            // Asynchronously broadcast this row to all other processes
-            MPI_Request req;
-            MPI_Ibcast(&new_grid[i][1], N, MPI_DOUBLE, rank, MPI_COMM_WORLD, &req);
-            requests.push_back(req);
+                if (i < N / size - 1)
+                {
+                    s = local[(i + 1) * N + j];
+                }
+                else
+                {
+                    s = (rank != size - 1) ? next[j] : 30.0;
+                }
+
+                if (i > 0 && j > 0)
+                {
+                    nw = local[(i - 1) * N + (j - 1)];
+                }
+                else
+                {
+                    nw = (rank != 0 && j > 0) ? prev[j - 1] : 30.0;
+                }
+
+                if (i > 0 && j < N - 1)
+                {
+                    ne = local[(i - 1) * N + (j + 1)];
+                }
+                else
+                {
+                    ne = (rank != 0 && j < N - 1) ? prev[j + 1] : 30.0;
+                }
+
+                if (i < N / size - 1 && j > 0)
+                {
+                    sw = local[(i + 1) * N + (j - 1)];
+                }
+                else
+                {
+                    sw = (rank != size - 1 && j > 0) ? next[j - 1] : 30.0;
+                }
+
+                if (i < N / size - 1 && j < N - 1)
+                {
+                    se = local[(i + 1) * N + (j + 1)];
+                }
+                else
+                {
+                    se = (rank != size - 1 && j < N - 1) ? next[j + 1] : 30.0;
+                }
+
+                double w = (j > 0) ? local[i * N + j - 1] : 30.0;
+                double e = (j < N - 1) ? local[i * N + j + 1] : 30.0;
+                temp[i * N + j] = nw * k[0][0] + n * k[0][1] + ne * k[0][2] + w * k[1][0] + local[i * N + j] * k[1][1] + e * k[1][2] + sw * k[2][0] + s * k[2][1] + se * k[2][2];
+            }
         }
 
-        // Asynchronously receive rows from other processes
-        for (int i = 1; i <= N; i++)
-        {
-            int owner = (i - 1) % size;
-            if (owner != rank)
-            {
-                MPI_Request req;
-                MPI_Ibcast(&new_grid[i][1], N, MPI_DOUBLE, owner, MPI_COMM_WORLD, &req);
-                requests.push_back(req);
-            }
-        }
-
-        // Wait for all communications to complete
-        MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
-
-        // Swap grids
-        double **temp = grid;
-        grid = new_grid;
-        new_grid = temp;
+        delete[] prev;
+        delete[] next;
+        std::swap(local, temp);
     }
+    MPI_Gather(local, chunk, MPI_DOUBLE, (rank == 0 ? grid : nullptr), chunk, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    if (rank == 0)
-        std::cout << MPI_Wtime() - t0 << std::endl;
-    // Cleanup
-    for (int i = 0; i <= N + 1; i++)
-    {
-        delete[] grid[i];
-        delete[] new_grid[i];
-    }
     delete[] grid;
-    delete[] new_grid;
-
+    if (rank == 0)
+        std::cout << "Parallel: " << MPI_Wtime() - t0;
     MPI_Finalize();
     return 0;
 }

@@ -32,11 +32,14 @@ COPY src/ /app/src/
 COPY Makefile /app/
 
 # Build programs from all folders
-# Folder 1: sync
+# Folder 1: async and sync
 # Folder 2: async and sync
 # Folder 3: async and sync
 RUN cd /app && \
     rm -f src/1/*.o src/2/*.o src/3/*.o && \
+    make clean && \
+    make SRCDIR=src/1 TARGET=async && \
+    mv async async_1 && \
     make clean && \
     make SRCDIR=src/1 TARGET=sync && \
     mv sync sync_1 && \

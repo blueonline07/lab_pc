@@ -3,7 +3,7 @@
 # Script to run MPI program across distributed nodes
 # Usage: ./run-mpi.sh [folder] [program_name] [input_file]
 #   folder: 1, 2, or 3 (which source folder to use, default: 2)
-#   program_name: sync or async (async available in folders 2 and 3, default: sync)
+#   program_name: sync or async (async available in folders 1, 2, and 3, default: sync)
 #   input_file: Input CSV file (required for folders 1 and 2, ignored for folder 3)
 # Note: Always uses 3 processes (1 per node)
 # Note: Folder 3 does not require an input file
@@ -19,15 +19,13 @@ if [ "$FOLDER" != "1" ] && [ "$FOLDER" != "2" ] && [ "$FOLDER" != "3" ]; then
     exit 1
 fi
 
-# Validate program for folder 1 (only sync available)
-if [ "$FOLDER" == "1" ] && [ "$PROGRAM" == "async" ]; then
-    echo "Error: async is not available in folder 1, only sync"
-    exit 1
-fi
-
 # Determine executable name
 if [ "$FOLDER" == "1" ]; then
-    EXECUTABLE="sync_1"
+    if [ "$PROGRAM" == "async" ]; then
+        EXECUTABLE="async_1"
+    else
+        EXECUTABLE="sync_1"
+    fi
 elif [ "$FOLDER" == "3" ]; then
     if [ "$PROGRAM" == "async" ]; then
         EXECUTABLE="async_3"
@@ -58,10 +56,11 @@ if [ "$FOLDER" != "3" ]; then
         echo "Warning: Input file '$INPUT_FILE' not found. Make sure it exists in the containers."
     fi
     # Run MPI program with input file
+    # Use absolute path so mpirun can find executable on all nodes
     docker exec mpi_node1 bash -c "cd /app && mpirun --allow-run-as-root -np $NUM_PROCESSES --hostfile hosts.txt --map-by ppr:1:node ./$EXECUTABLE $CONTAINER_INPUT_FILE"
 else
-    echo "Note: Folder 3 does not require an input file"
     # Run MPI program without input file
+    # Use absolute path so mpirun can find executable on all nodes
     docker exec mpi_node1 bash -c "cd /app && mpirun --allow-run-as-root -np $NUM_PROCESSES --hostfile hosts.txt --map-by ppr:1:node ./$EXECUTABLE"
 fi
 
